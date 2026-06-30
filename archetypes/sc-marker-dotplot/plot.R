@@ -27,11 +27,13 @@ p <- ggplot(agg, aes(celltype, gene)) +
   geom_point(aes(size=pct, colour=z)) +
   scale_size_continuous(range=c(0.2,4.2), name="% expr") +
   scale_colour_gradientn(colours=rev(nature_div), name="mean expr (z)") +
-  labs(x=NULL, y=NULL, title="Marker expression dotplot (synthetic demo)") +
+  labs(x=NULL, y=NULL, title="Marker expression dotplot (synthetic demo)",
+       caption="Synthetic scRNA-seq, style demo only (not real results). set.seed(11).") +
   theme_nature() +
   theme(axis.text.x=element_text(angle=45, hjust=1),
         axis.text.y=element_text(size=4.5),
-        panel.grid.major=element_line(linewidth=0.15, colour="grey92"))
+        panel.grid.major=element_line(linewidth=0.15, colour="grey92"),
+        plot.caption=element_text(size=6, colour="grey45", hjust=0, family=NATURE_FONT))
 
 save_nature(p, file.path(out,"ref"), width_mm=120, height_mm=150)
 cat("done:", file.path(out,"ref.png"), "\n")

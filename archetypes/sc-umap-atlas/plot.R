@@ -2,7 +2,7 @@
 # Archetype: 单细胞 UMAP atlas（聚类着色 + marker feature 分面）
 suppressPackageStartupMessages({
   source(file.path(dirname(sub("--file=","",grep("--file=",commandArgs(FALSE),value=TRUE)[1])), "..", "_lib", "figure_setup.R"))
-  library(ggplot2); library(ggrastr); library(patchwork); library(viridisLite)
+  library(ggplot2); library(ggrastr); library(patchwork)
 })
 here <- dirname(sub("--file=","",grep("--file=",commandArgs(FALSE),value=TRUE)[1]))
 if (is.na(here) || here=="") here <- "archetypes/sc-umap-atlas"
@@ -28,7 +28,7 @@ feat_panel <- function(g) {
   d <- emb; d$expr <- s$expr[g, ]
   ggplot(d, aes(UMAP1, UMAP2, colour=expr)) +
     ggrastr::rasterise(geom_point(size=0.3), dpi=300) +
-    scale_colour_gradientn(colours=c("grey88", nature_seq[4], nature_div[1]), name="expr") +
+    scale_colour_gradientn(colours=c("grey88", nature_seq[4], nature_seq[6]), name="expr") +
     coord_fixed() + labs(title=g) + theme_nature(base_size=6) +
     theme(axis.text=element_blank(), axis.ticks=element_blank(), axis.title=element_blank(),
           legend.key.width=unit(2,"mm"), legend.key.height=unit(4,"mm"))
