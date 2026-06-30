@@ -45,7 +45,10 @@ attr(ph, "mapping") <- orig_mapping
 ph <- ph +
   scale_fill_gradientn(colours=nature_div, name="Row z",
                        guide=guide_colorbar(barwidth=0.4, barheight=3)) +
-  theme(legend.title=element_text(size=6), legend.text=element_text(size=5))
+  # coord_cartesian(clip="off"): allow column label text to draw above the panel top edge.
+  coord_cartesian(clip="off") +
+  theme(legend.title=element_text(size=6), legend.text=element_text(size=5),
+        plot.margin=margin(t=18, r=4, b=4, l=4, unit="mm"))
 
-save_nature(ph, file.path(out,"ref"), width_mm=150, height_mm=120)
+save_nature(ph, file.path(out,"ref"), width_mm=150, height_mm=130)
 cat("done:", file.path(out,"ref.png"), "\n")
