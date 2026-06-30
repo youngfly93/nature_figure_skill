@@ -38,3 +38,37 @@ synth_genome <- function(seed = 5, n_chr = 8, per = 40) {
                       chr2=sample(chr,6,TRUE), pos2=sample(1:1000,6))
   list(track=track, links=links, chromosomes=chr)
 }
+
+# —— Phase 1 追加 ——
+synth_mutations <- function(n_genes = 20, n_samples = 40, seed = 7) {
+  set.seed(seed)
+  types <- c("Missense", "Truncating", "Amp", "Del")
+  genes <- paste0("GENE", sprintf("%02d", seq_len(n_genes)))
+  samp  <- paste0("P", sprintf("%03d", seq_len(n_samples)))
+  freq  <- sort(runif(n_genes, 0.05, 0.6), decreasing = TRUE)   # 高频基因在前
+  mat <- matrix("", n_genes, n_samples, dimnames = list(genes, samp))
+  for (i in seq_len(n_genes)) for (j in seq_len(n_samples)) {
+    if (runif(1) < freq[i]) {
+      k <- sample(types, sample(1:2, 1), prob = c(.5, .25, .15, .10))
+      mat[i, j] <- paste(k, collapse = ";")
+    }
+  }
+  clin <- data.frame(
+    Subtype = factor(sample(c("S1","S2","S3"), n_samples, TRUE)),
+    Stage   = factor(sample(c("I","II","III"), n_samples, TRUE), levels = c("I","II","III")),
+    row.names = samp)
+  list(mat = mat, types = types, clin = clin)
+}
+
+synth_tree <- function(n_tip = 24, n_feat = 6, seed = 8) {
+  set.seed(seed)
+  if (!requireNamespace("ape", quietly = TRUE)) stop("需要 ape 包")
+  tr <- ape::rtree(n_tip)
+  tr$tip.label <- paste0("T", sprintf("%02d", seq_len(n_tip)))
+  grp <- factor(sample(c("Clade A","Clade B","Clade C"), n_tip, TRUE))
+  mat <- matrix(rnorm(n_tip * n_feat), n_tip, n_feat,
+                dimnames = list(tr$tip.label, paste0("Feat", seq_len(n_feat))))
+  mat <- mat + as.numeric(grp)                      # 按 clade 注入结构
+  mat <- t(scale(t(mat)))                           # 行 z-score
+  list(tree = tr, mat = mat, group = grp)
+}
