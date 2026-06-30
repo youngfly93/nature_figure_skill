@@ -74,8 +74,6 @@
 
 ### C. oncoprint 突变全景图（ComplexHeatmap::oncoPrint）
 
-**参考图**：`assets/advanced-archetypes/oncoprint.png`（部署后路径，相对于 skill 根目录）
-
 | 项目 | 详情 |
 |---|---|
 | **何时用** | 基因×样本的突变/CNV 矩阵，想一图展示哪些基因在哪些样本被改变、变异类型构成及与临床注释的关系。癌症基因组 Main Figure 常客 |
@@ -91,8 +89,6 @@
 
 ### D. 基因组圈图（circlize）
 
-**参考图**：`assets/advanced-archetypes/circos.png`（部署后路径，相对于 skill 根目录）
-
 | 项目 | 详情 |
 |---|---|
 | **何时用** | 全基因组多维证据（CNV、表达、突变密度、染色体间重排/互作）想在一张圆图里同时展示；泛基因组/结构变异 Figure |
@@ -107,8 +103,6 @@
 ---
 
 ### E. 进化树+热图联排（ggtree::gheatmap）
-
-**参考图**：`assets/advanced-archetypes/phylo_heatmap.png`（部署后路径，相对于 skill 根目录）
 
 | 项目 | 详情 |
 |---|---|

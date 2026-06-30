@@ -43,7 +43,7 @@ ph <- gheatmap(p, as.data.frame(d$mat), offset=0.6, width=0.6,
 attr(ph, "mapping") <- orig_mapping
 
 ph <- ph +
-  scale_fill_gradientn(colours=nature_div, name="Row z",
+  scale_fill_gradientn(colours=rev(nature_div), name="Row z",
                        guide=guide_colorbar(barwidth=0.4, barheight=3)) +
   # coord_cartesian(clip="off"): allow column label text to draw above the panel top edge.
   coord_cartesian(clip="off") +
