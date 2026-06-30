@@ -176,3 +176,25 @@ synth_sets <- function(n_items = 200, seed = 23) {
        Methylated = sample(pool, 60),
        CNV_gain   = sample(pool, 50))
 }
+
+# —— Phase 4 追加：clinical ——
+synth_forest <- function(seed = 31) {
+  set.seed(seed)
+  term <- c("Age >= 60","Male","Stage III-IV","High grade","Subtype C2",
+            "TP53 mut","High TMB","Treatment B","ECOG >= 2")
+  hr <- round(exp(rnorm(length(term), 0, 0.45)), 2)
+  se <- runif(length(term), 0.12, 0.30)
+  lo <- round(hr * exp(-1.96 * se), 2); hi <- round(hr * exp(1.96 * se), 2)
+  z  <- abs(log(hr)) / se; p <- round(2 * pnorm(-z), 4)
+  data.frame(term = term, HR = hr, lo = lo, hi = hi, p = p,
+             n = sample(40:120, length(term)), stringsAsFactors = FALSE)
+}
+
+synth_box <- function(n = 160, seed = 32) {
+  set.seed(seed)
+  group <- factor(rep(c("Ctrl","LowDose","HighDose","Combo"), length.out = n),
+                  levels = c("Ctrl","LowDose","HighDose","Combo"))
+  base <- c(Ctrl = 0, LowDose = 0.6, HighDose = 1.4, Combo = 2.2)[group]
+  value <- as.numeric(base) + rnorm(n, 0, 0.8)
+  data.frame(group = group, value = value)
+}
