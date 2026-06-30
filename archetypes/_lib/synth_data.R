@@ -132,3 +132,47 @@ synth_spatial <- function(n_spots = 1500, seed = 12) {
   feature <- sin(g$x / side * pi) * 2 + g$y / side + rnorm(n_spots, 0, 0.25)  # 空间梯度
   data.frame(x = g$x, y = g$y, celltype = factor(dom), feature = feature)
 }
+
+# —— Phase 3 追加：关系/网络/集合 ——
+synth_network <- function(n_terms = 8, genes_per_term = 6, seed = 21) {
+  set.seed(seed)
+  terms <- c("Cell cycle","DNA repair","Immune response","Apoptosis",
+             "Angiogenesis","p53 signaling","MAPK cascade","Metabolism")[seq_len(n_terms)]
+  gene_pool <- paste0("G", sprintf("%03d", seq_len(60)))
+  edges <- do.call(rbind, lapply(seq_along(terms), function(i) {
+    g <- sample(gene_pool, genes_per_term + sample(0:4, 1))
+    data.frame(from = terms[i], to = g, stringsAsFactors = FALSE)
+  }))
+  terms_df <- data.frame(name = terms, p.adjust = sort(10^(-runif(n_terms, 2, 8))),
+                         stringsAsFactors = FALSE)
+  list(edges = edges, terms = terms_df)
+}
+
+synth_flow <- function(n = 300, seed = 22) {
+  set.seed(seed)
+  tissue  <- sample(c("Tumor","Normal"), n, TRUE, prob = c(.72, .28))
+  subtype <- factor(ifelse(tissue == "Tumor",
+                           sample(c("C1","C2","C3"), n, TRUE), "Normal"),
+                    levels = c("C1","C2","C3","Normal"))
+  presp   <- ifelse(subtype %in% c("C1","Normal"), .7, .35)
+  response <- factor(ifelse(runif(n) < presp, "Responder", "Non-responder"),
+                     levels = c("Responder","Non-responder"))
+  data.frame(Tissue = tissue, Subtype = subtype, Response = response)
+}
+
+synth_chord <- function(n_cat = 6, seed = 24) {
+  set.seed(seed)
+  cats <- paste0("CellType", seq_len(n_cat))
+  m <- matrix(rpois(n_cat^2, 5), n_cat, n_cat, dimnames = list(cats, cats))
+  diag(m) <- 0
+  m
+}
+
+synth_sets <- function(n_items = 200, seed = 23) {
+  set.seed(seed)
+  pool <- seq_len(n_items)
+  list(DEG_up     = sample(pool, 85),
+       DEG_down   = sample(pool, 70),
+       Methylated = sample(pool, 60),
+       CNV_gain   = sample(pool, 50))
+}
