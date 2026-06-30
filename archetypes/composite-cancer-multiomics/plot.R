@@ -1,6 +1,10 @@
 #!/usr/bin/env Rscript
 # Archetype: 复合多面板叙事大图(癌症多组学)
 suppressPackageStartupMessages({
+  # Nature 图为英文专用 → 严格 Helvetica 字形（与 omics 热图一致，Nature 标准西文）。
+  # 经 theme 官方 hook 覆盖其 CJK-first 默认（不改共享真源，仅本图生效，中文报告 CJK 不受影响）。
+  # 选 "Helvetica" 而非 "Arial"：fontconfig 解析为真 Arial 字形且在 PS 字体库内，消除度量警告。
+  options(nature_font = "Helvetica")
   source("~/.claude/assets/figure-style/nature_theme.R")
   library(ComplexHeatmap); library(circlize); library(grid)
   library(ggplot2); library(survival); library(survminer); library(cowplot); library(scales)
