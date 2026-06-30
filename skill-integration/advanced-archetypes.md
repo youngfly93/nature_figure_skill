@@ -8,8 +8,8 @@
 
 | 分析场景 | 基础（能用但浪费） | 中级（合格） | **高级（优先目标）** |
 |---|---|---|---|
-| **两组差异表达** | 分组柱状图（均值±SD） | 带统计标注箱线图（ggpubr） | **多注释差异热图**（ComplexHeatmap，带样本亚型/分期注释轨道）✅就绪；或**带注释火山图**（ggplot2+ggrepel，ggsci NPG 配色，FDR 阈值线 + 关键基因标注）✅就绪 |
-| **生存分析** | 单条 KM 曲线 | 分层 KM + log-rank p 值（survminer） | **多组学复合叙事大图**（KM + 热图 + 富集 + PCA 拼版，patchwork hero 布局，故事完整）✅就绪 |
+| **两组差异表达** | 分组柱状图（均值±SD） | 带统计标注箱线图（ggpubr）✅就绪 | **多注释差异热图**（ComplexHeatmap，带样本亚型/分期注释轨道）✅就绪；或**带注释火山图**（ggplot2+ggrepel，ggsci NPG 配色，FDR 阈值线 + 关键基因标注）✅就绪 |
+| **生存分析** | 单条 KM 曲线 | 分层 KM + log-rank p 值（survminer） | **多组学复合叙事大图**（KM + 热图 + 富集 + PCA 拼版，patchwork hero 布局，故事完整）✅就绪；或 **多变量 Cox 森林图**（nature_forest，HR+95%CI 临床 Main 常客）✅就绪 |
 | **聚类/降维结构** | PCA 散点（默认颜色） | 带置信椭圆 PCA（ggplot2 stat_ellipse） | **多注释 ComplexHeatmap**（行/列聚类 + 多轨道样本注释，展现亚群结构与生物学意义）✅就绪 |
 | **富集/通路分析** | 条形图（Top 10 条） | dotplot（ggplot2，气泡=基因数，颜色=p） | **通路网络图**（ggraph 二部图，cnetplot 风格）✅就绪；canonical 替代：enrichplot::cnetplot / emapplot；或**ridge plot**（enrichplot::ridgeplot，展示全基因集分布）⏳预留（Phase 1+，暂无就绪脚本） |
 | **多组学整合** | 逐个出图拼 PPT | 相关性热图（Hmisc + corrplot） | **复合多面板叙事大图**（表达/生存/通路/基因组四象限，cowplot 拼装，逻辑链完整）✅就绪 |
@@ -43,7 +43,7 @@
 
 > 分析护栏保证"数对"；设计护栏保证"图不骗人、不啰嗦"。漂亮但 misleading 的图和丑图一样不能发。落笔前逐条自检：
 
-1. **≤ 3 主色**：优先 `ggsci` 期刊配色（`pal_npg("nrc")`、`scale_color_lancet()`、`scale_color_nejm()`）；禁用彩虹色 / 默认 ggplot2 色板。颜色数量超过 3 个时，多出来的是噪声，不是信息。
+1. **≤ 3 主色**：优先 `ggsci` 期刊配色（`pal_npg("nrc")`、`scale_color_lancet()`、`scale_color_nejm()`）；禁用彩虹色 / 默认 ggplot2 色板。颜色数量超过 3 个时，多出来的是噪声，不是信息。（现已并入 nature_theme.R：可直接 `nature_journal_pal(journal,n)` / `scale_color_journal()` / `scale_fill_journal()`，缺包优雅回退）
 2. **统一字体层级**：一套字体（Arial / Helvetica），靠**字号 + 字重**区分层级（标题 > 坐标轴标题 > 刻度标签 > 图注）；不混用字体，不靠颜色区分层级。
 3. **去 chartjunk**：删灰底、多余网格线、冗余边框、重复图例。每个视觉元素都要问"去掉它信息会丢吗？"——答案是"不会"则删。
 4. **留白**：图元之间给呼吸空间，不塞满画布；标注/标签拥挤是信息过载，不是解决方案。
@@ -285,6 +285,38 @@
 
 ---
 
+### O. 多变量 Cox 森林图（theme nature_forest）
+
+**参考图**：`assets/advanced-archetypes/forest.png`（部署后路径，相对于 skill 根目录）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 多变量 Cox 模型中各协变量的 HR 及 95% CI，一图展示哪些因素显著（红点）与哪些不显著（灰点），并附数值标注；临床预后 Main Figure 常客 |
+| **数据形状** | data.frame（term, HR, lo, hi, p, n）；`synth_forest(seed=31)` 返回示例 |
+| **核心依赖** | `nature_forest()`（nature_theme.R 内置，无需装包）、figure_setup.R |
+| **配色规则** | 显著(p<0.05)=`nature_sig_col` 红，ns=灰；HR=1 处虚线参考；x 轴 log10 |
+| **渲染翻车点** | ① x 轴是 log10 刻度，CI 在 log 轴上左右不对称属正常；若强制线性轴（`trans="identity"`），视觉上会严重扭曲小 HR 的间距，误导读者；② HR=1 参考线必须存在，虚线标注"无效应"基准线，缺失则读者无法判断方向（保护 vs. 风险）；③ 最宽 CI 标签易与须线重叠——传 `xlim` 留头部空间，`xlim` 裁切须在 caption 注明截断范围（如 "CI truncated at x=0.1/10"），不能静默截断；④ `show_label=TRUE` 时右侧数值标注需要额外空间，`width_mm` 过窄会导致标注与图形重叠——建议 ≥120 mm（单栏），大型 forest 用双栏 183 mm；⑤ 修改 `sig_level` 后须同步更新 `scale_colour_manual` 的 `labels`（`nature_forest` 内部已自动格式化，手动覆盖时需注意） |
+| **分析严谨翻车点** | ⑥ **多变量校正与否，结论可能相反**：单变量 Cox 中 HR 显著的变量，进入多变量模型后可能因与其他协变量的混淆而变为 ns，反之亦然——须注明是"单变量"还是"多变量"模型及纳入的协变量列表（如 Age + Stage + Grade），不能只写"Cox 分析"；⑦ **宽 CI（小 n）点估计不稳定**：CI 极宽的变量（如 n<30 的亚组）其 HR 置信度极低，不应只报 HR 点估计或仅依据 p 值下结论——应同时展示 n 或在图注警告小样本不稳定性；⑧ **多重比较 p 偏乐观**：同时检验多个协变量，原始 p 值存在 I 型错误膨胀；若未做 Bonferroni/FDR 校正，红色"显著"点数量可能虚高——须在 caption 或方法节注明是否校正 |
+| **参考实现** | `archetypes/clinical-forest/` |
+
+---
+
+### P. 带显著性标注箱线图（ggpubr stat_compare_means）
+
+**参考图**：`assets/advanced-archetypes/boxsig.png`（部署后路径，相对于 skill 根目录）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 多组（≤4 组）连续变量比较，叠加 jitter 散点，标注全局 KW p 值及两两 Wilcoxon vs Ctrl 星号；临床/实验分组 Figure 常客 |
+| **数据形状** | data.frame（group [factor], value [numeric]）；须显式 factor 锁定组顺序；`synth_box(seed=32)` 返回 n=160 4 组示例 |
+| **核心依赖** | `ggpubr`、`ggsci`（经 ggpubr `palette="npg"` 局部使用）、figure_setup.R |
+| **配色规则** | ggsci npg ≤4 组；jitter 透明 0.5；全局 KW + 两两 Wilcoxon vs Ctrl |
+| **渲染翻车点** | ① `comparisons` 配对顺序：每个元素必须是长度为 2 的字符向量，且组名须与 `x` 轴 factor levels 完全匹配（大小写/空格敏感）；若组名不一致会静默跳过或报错，导致括号消失；② `label.y` 防与须状（bracket）重叠：全局 KW 的 `label.y` 应设为 `max(d$value) + 足够偏移量`（本例 +2.2），偏移量不足时 KW 标签会压在最高一个显著性括号上，偏移量过大会超出图框；③ jitter 透明度遮箱体：`add.params=list(size=0.6, alpha=0.5)` 控制散点大小与透明度，size 过大或 alpha 过高会遮住箱体四分位线，alpha 过低则散点消失；④ **长 caption 须换行（`sep="\n"`）防右侧截断**；⑤ ggpubr 与 ggplot2 4.x 偶有内部 layer 接口变更警告，建议显式指定 `method="wilcox.test"`（两组）或 `method="kruskal.test"`（多组）而非依赖默认值 |
+| **分析严谨翻车点** | ⑥ **`*` 只表 p 阈值不表效应量**：`****`（p<0.0001）不意味着临床意义显著；须并报效应量（如 Cohen's d、rank-biserial r）和置信区间，不能仅凭星号得出结论；⑦ **默认非参检验（Wilcoxon/KW）假设须核对**：均假设分布形态相同（仅位置参数不同）；若各组分布形态差异较大，Wilcoxon 的原假设是"分布相同"而非"中位数相同"，解读需注意；数据正态时应优先考虑 t 检验（两组）或单因素 ANOVA（多组）以获得更高检验效能；⑧ **多两两比较未校正假阳性须 p.adjust**：若同时做 k(k-1)/2 对全排列比较，假阳性概率急剧上升；正式分析须指定 `p.adjust.method`（如 `"BH"`），或改用 Dunnett's test |
+| **参考实现** | `archetypes/box-compare/` |
+
+---
+
 ## ③ 诚实边界
 
 以下类型图形**代码无法胜任**，不要尝试硬用 R/Python 画：
@@ -301,4 +333,4 @@
 
 ---
 
-*Phase 0 两个 archetype 就绪（A、B）；Phase 1 新增三个（C oncoprint、D circos、E ggtree+heatmap）；Phase 1.5 新增 F 火山图、①·6 设计克制护栏、诚实 caption 约定，B composite 更新为 hero 布局；Phase 2 新增四个单细胞/空间组学 archetype（G UMAP Atlas、H marker dotplot、I 拟时序/slingshot、J 空间 feature 叠图），各含分析严谨翻车点；野心阶梯"单细胞/UMAP"条目更新为 ✅就绪；Phase 3 新增四个关系/网络/集合 archetype（K 富集通路网络 ggraph、L Sankey/alluvial 流向图、M chord 弦图、N UpSet 集合交集图），各含分析严谨翻车点；野心阶梯"富集/通路分析"高级项通路网络更新为 ✅就绪；后续 Phase 追加新条目到「已就绪 Archetype 清单」，更新本文件。*
+*Phase 0 两个 archetype 就绪（A、B）；Phase 1 新增三个（C oncoprint、D circos、E ggtree+heatmap）；Phase 1.5 新增 F 火山图、①·6 设计克制护栏、诚实 caption 约定，B composite 更新为 hero 布局；Phase 2 新增四个单细胞/空间组学 archetype（G UMAP Atlas、H marker dotplot、I 拟时序/slingshot、J 空间 feature 叠图），各含分析严谨翻车点；野心阶梯"单细胞/UMAP"条目更新为 ✅就绪；Phase 3 新增四个关系/网络/集合 archetype（K 富集通路网络 ggraph、L Sankey/alluvial 流向图、M chord 弦图、N UpSet 集合交集图），各含分析严谨翻车点；野心阶梯"富集/通路分析"高级项通路网络更新为 ✅就绪；后续 Phase 追加新条目到「已就绪 Archetype 清单」，更新本文件。Phase 4 新增两个 clinical archetype（O 多变量 Cox 森林图 nature_forest、P ggpubr 带*箱线 stat_compare_means），各含分析严谨翻车点；阶梯"两组差异/生存分析"相应项标 ✅就绪；ggsci 期刊配色已并入 nature_theme.R（nature_journal_pal/scale_*_journal）。*

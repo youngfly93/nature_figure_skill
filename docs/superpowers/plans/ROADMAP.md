@@ -9,12 +9,12 @@
 - [x] Phase 3（关系网络）：富集通路网络 + Sankey/alluvial + chord 弦图 + UpSet 集合交集
   - **参考蓝本** `03_enrichment`（enrichplot cnetplot/emapplot/gseaplot2）+ ggraph 网络
   - **回归**：全 14 archetype QA PASS (2026-06-30)；非致命噪声：circos "out of plotting region"、ggtree aes_string 弃用警告、slingshot info、ggalluvial "strata at multiple axes"、UpSetR aes_string/size 弃用警告——均已在 task-7-brief 列为预期。
-  - **后续 clinical 小集**：forestploter（森林图，可用 theme nature_forest 无需额外装包）+ ggpubr stat_compare_means（带 * 箱线）归入后续 Phase；本期未触发缺包阻塞。
-- [ ] Phase 4（收口）：野心阶梯写入 SKILL.md 主流程 · 全库回归 · 文档索引
-  - 收口重点：SKILL.md 主流程补全 14-archetype 引导 + advanced-archetypes.md 索引；全库最终回归；文档 DOCS_INDEX 更新。
+- [x] Phase 4（clinical 小集 + 收口）：森林图(O, theme nature_forest) + ggpubr 带*箱线(P, stat_compare_means) 两个 clinical archetype；野心阶梯接进 nature-figure SKILL.md 主流程（Default operating stance 出图前默认查阶梯 + 画前自检）；ggsci 期刊配色增量折进共享 nature_theme.R；advanced-archetypes.md 索引扩到 O/P。
+  - **回归**：全 **16** archetype 渲染 + QA PASS (2026-06-30)；C1 theme 增量后既有 16 图零破坏。
+  - **共享件改动（控制者亲做，纯增量+备份+diff+回归）**：① nature_theme.R 末尾追加 `nature_journal_pal(journal,n)` + `scale_color/colour/fill_journal()`（缺 ggsci 回退 nature_pal_anno），不改任何既有定义（备份 .bak_20260630，source-check 16 既有函数无缺失）；② SKILL.md Default operating stance 加阶梯指引 bullet + Related files 加 advanced-archetypes.md 行（备份 .bak_20260630）。
 
 每个 Phase 各自展开成 docs/superpowers/plans/ 下独立详细计划,沿用 Phase 0 的"五件套 + QA 门禁"模式。
 
 ## 待决策项
 
-- **ggsci 期刊配色是否折进共享 `nature_theme.R`（作为 house 选项）** —— 跨项目影响，需用户拍板；当前仅在 volcano archetype 内局部用。
+- ~~**ggsci 期刊配色是否折进共享 `nature_theme.R`**~~ —— ✅ 已拍板并落地（Phase 4 控制者 C1，纯增量 `nature_journal_pal()` / `scale_*_journal()`，缺包优雅回退；既有调色板/默认零改动）。
