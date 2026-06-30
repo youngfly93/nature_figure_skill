@@ -8,8 +8,8 @@
 
 | 分析场景 | 基础（能用但浪费） | 中级（合格） | **高级（优先目标）** |
 |---|---|---|---|
-| **两组差异表达** | 分组柱状图（均值±SD） | 带统计标注箱线图（ggpubr） | **多注释差异热图**（ComplexHeatmap，带样本亚型/分期注释轨道）✅就绪；或**带边际分布火山图**（ggside/ggExtra，展示整体分布与显著点）⏳预留（Phase 1+，暂无就绪脚本） |
-| **生存分析** | 单条 KM 曲线 | 分层 KM + log-rank p 值（survminer） | **多组学复合叙事大图**（KM + 热图 + 富集 + 基因组证据拼版，cowplot 多面板，故事完整）✅就绪 |
+| **两组差异表达** | 分组柱状图（均值±SD） | 带统计标注箱线图（ggpubr） | **多注释差异热图**（ComplexHeatmap，带样本亚型/分期注释轨道）✅就绪；或**带注释火山图**（ggplot2+ggrepel，ggsci NPG 配色，FDR 阈值线 + 关键基因标注）✅就绪 |
+| **生存分析** | 单条 KM 曲线 | 分层 KM + log-rank p 值（survminer） | **多组学复合叙事大图**（KM + 热图 + 富集 + PCA 拼版，patchwork hero 布局，故事完整）✅就绪 |
 | **聚类/降维结构** | PCA 散点（默认颜色） | 带置信椭圆 PCA（ggplot2 stat_ellipse） | **多注释 ComplexHeatmap**（行/列聚类 + 多轨道样本注释，展现亚群结构与生物学意义）✅就绪 |
 | **富集/通路分析** | 条形图（Top 10 条） | dotplot（ggplot2，气泡=基因数，颜色=p） | **通路网络图**（enrichplot::cnetplot / emapplot）⏳预留（Phase 1+，暂无就绪脚本）；或**ridge plot**（enrichplot::ridgeplot，展示全基因集分布）⏳预留（Phase 1+，暂无就绪脚本） |
 | **多组学整合** | 逐个出图拼 PPT | 相关性热图（Hmisc + corrplot） | **复合多面板叙事大图**（表达/生存/通路/基因组四象限，cowplot 拼装，逻辑链完整）✅就绪 |
@@ -39,6 +39,23 @@
 
 ---
 
+## ①·6 设计克制护栏（视觉设计原则——与分析护栏同等优先级）
+
+> 分析护栏保证"数对"；设计护栏保证"图不骗人、不啰嗦"。漂亮但 misleading 的图和丑图一样不能发。落笔前逐条自检：
+
+1. **≤ 3 主色**：优先 `ggsci` 期刊配色（`pal_npg("nrc")`、`scale_color_lancet()`、`scale_color_nejm()`）；禁用彩虹色 / 默认 ggplot2 色板。颜色数量超过 3 个时，多出来的是噪声，不是信息。
+2. **统一字体层级**：一套字体（Arial / Helvetica），靠**字号 + 字重**区分层级（标题 > 坐标轴标题 > 刻度标签 > 图注）；不混用字体，不靠颜色区分层级。
+3. **去 chartjunk**：删灰底、多余网格线、冗余边框、重复图例。每个视觉元素都要问"去掉它信息会丢吗？"——答案是"不会"则删。
+4. **留白**：图元之间给呼吸空间，不塞满画布；标注/标签拥挤是信息过载，不是解决方案。
+5. **对齐到网格**：面板标签、坐标轴、文字左对齐 / 基线对齐；子图行列边距保持一致。
+6. **数据-墨水比高**：每一滴墨水服务于信息传达，装饰性元素归零。
+7. **多面板用 patchwork**：`plot_annotation(tag_levels = "A")` 自动添加大写面板标签；`plot_layout(design = "AB\nAC")` 或 `plot_layout(widths = ...)` 控制比例；非 ggplot 对象（ComplexHeatmap / circos）先用 `grid.grabExpr() + wrap_elements(full = grob)` 封装后再拼。
+8. **精修感靠矢量导出，不靠代码堆**：R 代码出"毛坯" → 导出 PDF/SVG → Inkscape（免费）/ Illustrator 手工对齐字距、拼面板、加注释——那层"顶刊感"是矢量软件完成的，代码只做到 80 分。
+
+**诚实 caption 约定**：演示图 / 合成数据图的 caption 必须注明 `set.seed` 值、关键阈值（FDR 截断 / |log2FC| 截断）及 `"synthetic demo, not real results"`——数字可溯源，不夸大置信度，不以演示输出冒充真实结果。
+
+---
+
 ## ② 已就绪 Archetype 清单（Phase 0）
 
 ### A. 多注释轨道差异热图（ComplexHeatmap）
@@ -62,12 +79,15 @@
 
 | 项目 | 详情 |
 |---|---|
-| **何时用** | 一张 Figure 要把多个证据（表达/生存/通路/基因组）串成完整论证；靠**构图与叙事**而非单图复杂度，适用于文章 Main Figure |
-| **数据形状** | 每个面板各自数据（矩阵 / 生存 Surv 对象 / 富集结果 data.frame / 基因组注释段），不需要合并成一个大表 |
-| **核心依赖** | `ComplexHeatmap`、`circlize`、`cowplot`、`survminer`、`ggplot2`、`nature_theme.R` |
-| **拼装机制** | 非 ggplot 面板（热图/圈图）须先用 `grid.grabExpr()` / `cowplot::as_grob()` 转 grob，再与 ggplot 面板一起传入 `cowplot::plot_grid()`；子图标号 a/b/c/d 用 `label_*` 参数，粗体 8–9 pt |
-| **白底保障** | `plot_grid` 输出须追加 `theme(plot.background = element_rect(fill = "white", colour = NA))`，并在 `ggsave()` 传 `bg = "white"`；否则四角可能透明/灰底导致 QA 失败 |
-| **常见翻车点** | ① ComplexHeatmap / circos 不是 ggplot 对象，直接丢入 patchwork 或 ggpubr 会报错 → 必须转 grob 再拼；② 子图字号各自定义不一致 → 全部统一 7 pt base；③ 各面板配色各自为政 → 所有颜色走 `nature_theme.R` 调色板；④ 面板太多/留白不足 → 控制子图数 ≤ 6，`cowplot::plot_grid` 留合理 `rel_widths`/gap；⑤ 只导出 PNG → 同时导出 PDF 矢量（期刊投稿必需） |
+| **何时用** | 一张 Figure 要把多个证据（表达/生存/通路/PCA）串成完整论证；靠**构图与叙事**而非单图复杂度，适用于文章 Main Figure |
+| **数据形状** | 每个面板各自数据（矩阵 / 生存 Surv 对象 / 富集结果 data.frame / PCA 矩阵），不需要合并成一个大表 |
+| **核心依赖** | `ComplexHeatmap`、`grid`、`patchwork`、`ggplot2`、`survival`、`ragg`、`svglite`、`nature_theme.R` |
+| **Hero 布局（patchwork design）** | 面板 A（热图）经 `grid.grabExpr(ComplexHeatmap::draw(...))` 转 grob 后用 `patchwork::wrap_elements(full = ht_grob)` 封装；面板 B/C/D 为 house 函数直接返回的 ggplot 对象；全部 4 面板用 `plot_layout(design = "AB\nAC\nAD", widths = c(1.25, 1))` 拼合（A 跨左列 3 行，B/C/D 右侧垂直堆叠）；`plot_annotation(tag_levels = "A")` 自动添加大写面板标签 |
+| **House 函数（4 面板）** | `nature_hm_anno + nature_heatmap + nature_hm_gp` → 面板 A（带注释轨道、按亚型列分割的热图，须向 `nature_hm_anno()` 传入 `col = list(Subtype = sub_cols)` 以统一亚型颜色）；`nature_pca` → 面板 B；`nature_enrich_dot` → 面板 C（列名非"Description"时须显式传 `term=` 参数）；`nature_km(risk_table = FALSE)` → 面板 D（直接返回 ggplot，无需提取 `$plot`） |
+| **跨面板统一配色** | 调用一次 `nature_group_cols(levels)` 生成亚型调色板，同时传入热图注释轨道、`nature_pca(cols=sub_cols)` 和 `nature_km(cols=sub_cols)`，确保面板 A/B/D 同一亚型颜色完全一致 |
+| **白底保障** | `save_all()` 使用 `ragg::agg_png(..., bg = "white")` 和 `cairo_pdf(..., bg = "white")`；设备调用内部执行 `print(p)` 以正确渲染 patchwork；`unlink("Rplots.pdf")` 清理残留 |
+| **常见翻车点** | ① ComplexHeatmap 非 ggplot → 必须先 `grid.grabExpr + wrap_elements(full=...)` 转换再拼入 patchwork；② 字号各自定义 → 热图用 `nature_hm_gp()`，ggplot 面板靠 `theme_nature()` 统一；③ 各面板配色各自为政 → 全部通过 `nature_group_cols()` 统一；④ 面板太多/留白不足 → 控制子图 ≤ 6；⑤ 只导出 PNG → 同时导出 PDF/SVG |
+| **分析严谨翻车点** | ⑥ **PCA 分离 ≠ 因果**：无监督聚类描述结构，无法推断亚型差异是否导致表型；⑦ **KM 需排除混杂**：log-rank p 值反映关联，不代表独立预后意义，主张前须多变量 Cox；⑧ **富集须报 FDR**：始终经 BH 校正并注明阈值；⑨ **合成数据不是证据**：caption 必须注明 `synthetic demo, not real results` |
 | **参考实现** | `archetypes/composite-cancer-multiomics/` |
 
 ---
@@ -117,6 +137,22 @@
 
 ---
 
+### F. 带注释火山图（差异表达，ggplot2 + ggrepel + ggsci NPG）
+
+**参考图**：`assets/advanced-archetypes/volcano.png`（部署后路径，相对于 skill 根目录）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 双组差异表达 / 蛋白 / 甲基化，想一图展示效应量（log2FC）× 显著性（-log10 adjP）并标注关键基因；差异分析 Main / 补充图常客 |
+| **数据形状** | data.frame（基因名、logFC、校正 P 值 adj.P.Val）；阈值 \|log2FC\| 与 FDR 自定 |
+| **核心依赖** | `ggplot2`、`ggrepel`、`ggsci`、`patchwork`、`figure_setup.R`（`nature_theme.R` 入口） |
+| **配色规则** | `pal_npg("nrc")` 红（Up）/ 深蓝（Down）；ns 点浅灰，透明度 0.3–0.4 降噪；≤ 3 主色 |
+| **渲染翻车点** | ① ns 点不降透明 / 不缩点径 → 糊成一团遮住信号；② 标签不用 `ggrepel` → 互相重叠；③ 标注全部显著基因 → 太挤，只标 top N（按 \|log2FC\| 或 -log10P 排序，数量写死说明）；④ 坐标轴用纯文本 → 用 `expression(log[2]~FC, -log[10]~italic(P[adj]))` 排版；⑤ 灰底 + 默认配色 + 大图例 = chartjunk → 用 `theme_nature()` + 图例内嵌 |
+| **分析严谨翻车点** | ⑥ **必须用 FDR / adjP，不是原始 p 值**——12000 基因多重检验，原始 p<0.05 假阳性成片，纵轴须标注 `-log10(adjusted P)` 而非 `-log10(P)`；⑦ **高 -log10P ≠ 生物学重要**：极小 p 值可能来自高表达 / 低方差基因，需结合效应量（log2FC）与表达量综合判断，不能只看 y 轴；⑧ **标注基因不得 cherry-pick**——只挑"故事好"的标注会误导读者，须按统一规则（top \|log2FC\| 或 top 显著）选取并在 caption 中说明选取依据 |
+| **参考实现** | `archetypes/volcano-deg/` |
+
+---
+
 ## ③ 诚实边界
 
 以下类型图形**代码无法胜任**，不要尝试硬用 R/Python 画：
@@ -133,4 +169,4 @@
 
 ---
 
-*Phase 0 两个 archetype 就绪（A、B）；Phase 1 新增三个（C oncoprint、D circos、E ggtree+heatmap）；后续 Phase 追加新条目到「已就绪 Archetype 清单」，更新本文件。*
+*Phase 0 两个 archetype 就绪（A、B）；Phase 1 新增三个（C oncoprint、D circos、E ggtree+heatmap）；Phase 1.5 新增 F 火山图、①·6 设计克制护栏、诚实 caption 约定，B composite 更新为 hero 布局；后续 Phase 追加新条目到「已就绪 Archetype 清单」，更新本文件。*

@@ -72,3 +72,26 @@ synth_tree <- function(n_tip = 24, n_feat = 6, seed = 8) {
   mat <- t(scale(t(mat)))                           # 行 z-score
   list(tree = tr, mat = mat, group = grp)
 }
+
+# —— Phase 1.5 追加：差异表达（火山图用）——
+synth_deg <- function(n = 12000, n_up = 280, n_dn = 260, seed = 42) {
+  set.seed(seed)
+  n_ns <- n - n_up - n_dn
+  lf_ns <- rnorm(n_ns, 0, 0.35); z_ns <- rnorm(n_ns, 0, 0.9)
+  lf_up <- rnorm(n_up,  2.4, 0.7); z_up <- lf_up/0.30 + rnorm(n_up, 0, 1.2)
+  lf_dn <- rnorm(n_dn, -2.4, 0.7); z_dn <- lf_dn/0.30 + rnorm(n_dn, 0, 1.2)
+  logFC <- c(lf_ns, lf_up, lf_dn)
+  pval  <- 2 * pnorm(-abs(c(z_ns, z_up, z_dn)))
+  adjP  <- p.adjust(pval, "BH")
+  gene  <- sprintf("G%05d", seq_len(n))
+  up_sym <- c("MMP9","SPP1","CDK1","TOP2A","COL1A1","KIF20A","CCNB1","AURKA","FOXM1","UBE2C")
+  dn_sym <- c("ADH1B","PLIN1","CIDEC","ADIPOQ","FABP4","CD36","PPARG","KLF15","LPL","CFD")
+  gene[order(-logFC)[seq_along(up_sym)]] <- up_sym
+  gene[order( logFC)[seq_along(dn_sym)]] <- dn_sym
+  fc_th <- 1; p_th <- 0.05
+  sig <- factor(ifelse(adjP < p_th & logFC >=  fc_th, "Up",
+                ifelse(adjP < p_th & logFC <= -fc_th, "Down", "ns")),
+                levels = c("Up","Down","ns"))
+  data.frame(gene = gene, logFC = logFC, adj.P.Val = adjP, sig = sig,
+             y = -log10(pmax(adjP, 1e-300)), stringsAsFactors = FALSE)
+}
