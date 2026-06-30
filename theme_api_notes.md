@@ -175,7 +175,7 @@ NATURE_W_DOUBLE    # 183 mm（双栏宽）
 NATURE_W_FULL      # 247 mm（全版宽）
 nature_palette     # 具名颜色向量（~20色）
 nature_pal_anno    # 分组注释 pastel 配色（6色）
-nature_seq         # 顺序色阶（蓝→白，6色）
-nature_div         # 发散色阶（蓝→白→红，7色）
+nature_seq         # 顺序色阶（白→深蓝，6色）
+nature_div         # 发散色阶（红→白→蓝，7色）
 nature_sig_col     # 语义方向色（Up/Down/High/Low/Tumor/Normal）
 ```

@@ -1,6 +1,12 @@
 #!/usr/bin/env Rscript
 # Archetype: 多注释轨道差异热图 (ComplexHeatmap)
 suppressPackageStartupMessages({
+  # Nature 图为英文专用 → 严格 Helvetica 字形（Nature 标准西文）。
+  # 经 theme 官方 hook 覆盖其 CJK-first 默认（不改共享真源，仅本图生效）。
+  # 用 "Helvetica" 而非 "Arial"：① fontconfig 解析为真 Arial/Helvetica 字形，
+  # ragg+cairo 一致；② "Helvetica" 在 R 内置 PostScript 字体库里，绕开
+  # grid 文字度量查表的 "not found in PostScript font database" 警告。
+  options(nature_font = "Helvetica")
   source("~/.claude/assets/figure-style/nature_theme.R")
   library(ComplexHeatmap); library(circlize); library(grid)
 })

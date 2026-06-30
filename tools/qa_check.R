@@ -17,6 +17,6 @@ if (requireNamespace("png", quietly = TRUE)) {
   if (br < 0.9) fail(paste("四角非白底(亮度", round(br,3), "<0.9) — 检查默认灰底"))
   cat("QA PASS:", basename(png_path), "—", d[[2]], "x", d[[1]], "px, 角亮度", round(br,3), "\n")
 } else {
-  cat("QA PASS(降级:无 png 包,仅查存在与大小):", basename(png_path), "—", sz, "bytes\n")
+  cat("QA UNAVAILABLE: 缺 png 包，无法做白底/分辨率检测（核心门禁不可降级，请装 png）\n")
+  quit(status = 2)
 }
-quit(status = 0)

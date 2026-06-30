@@ -2,7 +2,7 @@
 # Phase 0 环境探测：所需包 + nature_theme.R 接口是否齐备
 THEME <- "~/.claude/assets/figure-style/nature_theme.R"
 req <- c("ComplexHeatmap","circlize","cowplot","survminer","survival",
-         "ggplot2","scales","grid","ragg")
+         "ggplot2","scales","grid","ragg","png")
 miss <- req[!vapply(req, requireNamespace, logical(1), quietly = TRUE)]
 cat("R:", as.character(getRversion()), "\n")
 if (length(miss)) { cat("缺失(Phase 0 必需):", paste(miss, collapse=", "), "\n"); quit(status=1) }

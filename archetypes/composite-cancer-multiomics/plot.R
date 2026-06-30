@@ -28,6 +28,7 @@ fit <- survfit(Surv(time, status) ~ group, data=sv)
 pal <- unname(nature_group_cols(levels(sv$group)))
 gB <- ggsurvplot(fit, data=sv, palette=pal, conf.int=FALSE, censor.size=2,
                  legend.title="", legend="right",
+                 legend.labs=levels(sv$group),
                  ggtheme=theme_nature(base_size=7))$plot +
       labs(x="Time (months)", y="Survival probability")
 
@@ -89,3 +90,4 @@ ggsave(file.path(out,"ref.png"), fig, width=183, height=160, units="mm",
 ggsave(file.path(out,"ref.pdf"), fig, width=183, height=160, units="mm",
        device=cairo_pdf, bg="white")
 cat("done:", file.path(out,"ref.png"), "\n")
+unlink("Rplots.pdf")
