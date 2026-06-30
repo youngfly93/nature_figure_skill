@@ -11,7 +11,7 @@
 | **两组差异表达** | 分组柱状图（均值±SD） | 带统计标注箱线图（ggpubr） | **多注释差异热图**（ComplexHeatmap，带样本亚型/分期注释轨道）✅就绪；或**带注释火山图**（ggplot2+ggrepel，ggsci NPG 配色，FDR 阈值线 + 关键基因标注）✅就绪 |
 | **生存分析** | 单条 KM 曲线 | 分层 KM + log-rank p 值（survminer） | **多组学复合叙事大图**（KM + 热图 + 富集 + PCA 拼版，patchwork hero 布局，故事完整）✅就绪 |
 | **聚类/降维结构** | PCA 散点（默认颜色） | 带置信椭圆 PCA（ggplot2 stat_ellipse） | **多注释 ComplexHeatmap**（行/列聚类 + 多轨道样本注释，展现亚群结构与生物学意义）✅就绪 |
-| **富集/通路分析** | 条形图（Top 10 条） | dotplot（ggplot2，气泡=基因数，颜色=p） | **通路网络图**（enrichplot::cnetplot / emapplot）⏳预留（Phase 1+，暂无就绪脚本）；或**ridge plot**（enrichplot::ridgeplot，展示全基因集分布）⏳预留（Phase 1+，暂无就绪脚本） |
+| **富集/通路分析** | 条形图（Top 10 条） | dotplot（ggplot2，气泡=基因数，颜色=p） | **通路网络图**（ggraph 二部图，cnetplot 风格）✅就绪；canonical 替代：enrichplot::cnetplot / emapplot；或**ridge plot**（enrichplot::ridgeplot，展示全基因集分布）⏳预留（Phase 1+，暂无就绪脚本） |
 | **多组学整合** | 逐个出图拼 PPT | 相关性热图（Hmisc + corrplot） | **复合多面板叙事大图**（表达/生存/通路/基因组四象限，cowplot 拼装，逻辑链完整）✅就绪 |
 | **单细胞/UMAP** | 单色 UMAP 散点 | 分组着色 UMAP（Seurat DimPlot） | **UMAP Atlas 复合图**（细胞类型 + marker 热图 + 差异气泡图多面板，展示生物学结构）✅就绪 |
 | **癌症基因组/突变全景** | 突变频率条形图或简单矩阵 | 热图展示突变类型 | **oncoprint 突变全景图**（ComplexHeatmap::oncoPrint，变异类型分层 + 临床注释轨道，Main Figure 常客）✅就绪 |
@@ -219,6 +219,72 @@
 
 ---
 
+---
+
+### K. 富集通路网络图（ggraph 二部图，cnetplot 风格）
+
+**参考图**：`assets/advanced-archetypes/enrich_network.png`（部署后路径，相对于 skill 根目录）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 基因集富集分析（GSEA/ORA）结果，展示通路与基因的双层关系网络；多条通路共享基因时，揭示核心调控基因及通路间交叉关系；适用于 Main Figure 富集结果展示 |
+| **数据形状** | edges data.frame（from=通路名, to=基因名）+ terms data.frame（name, p.adjust 显著性）；`synth_network()` 返回此结构；通路节点按基因数sizing，按 -log10(p.adjust) 着色，基因节点小灰 |
+| **核心依赖** | `ggraph`、`igraph`、`ggrepel`、`figure_setup.R`；canonical 替代：`enrichplot::cnetplot()`（直接接受 clusterProfiler enrichResult 对象）/ `enrichplot::emapplot()`（通路-通路相似度布局） |
+| **配色规则** | 通路节点用 `nature_seq[-1]`（浅蓝→深蓝，深蓝=更显著）；基因节点小灰；边细灰半透明（edge_width=0.25） |
+| **渲染翻车点** | ① `layout="fr"`（Fruchterman-Reingold）含随机→必须在 `ggraph()` 之前 `set.seed()` 否则图无法复现；② `geom_node_text` 对基因节点传 `NA_character_` 会触发 ggrepel "Removed N rows" 警告，属正常行为；③ 每条通路基因数有随机 jitter，degree 须从 graph 实际读取，不可硬编码；④ ggraph ≥2.x `geom_node_text(repel=TRUE)` 需 ggrepel，报错时改用 `check_overlap=TRUE`（但后者不推开标签，只消隐）；⑤ `theme_void()` 背景默认透明，须显式 `theme(plot.background=element_rect(fill="white"))` |
+| **分析严谨翻车点** | ⑥ **力导向布局节点距离是美学排布，不代表生物学相似性**——不得在正文描述"距离近的通路相关性强"，节点间距无定量意义；⑦ **边来自注释库，结论受版本影响**——通路-基因归属依赖 KEGG/MSigDB/GO 特定版本，不同版本同一基因的通路归属可能不同，图注须注明数据库及版本号；⑧ **通路冗余使网络虚胖**——高重叠通路（如"Cell cycle"与"G2M checkpoint"）会产生大量共享基因节点导致网络膨胀、视觉混乱，建议先 `clusterProfiler::simplify()` 或按相似度阈值去冗再出图；⑨ **基因节点标注过密**——若对基因节点也标名称，小图将不可读，只标通路名或配合 `max.overlaps` 限制密度 |
+| **参考实现** | `archetypes/enrich-network/` |
+
+---
+
+### L. Sankey / alluvial 流向图（ggalluvial）
+
+**参考图**：`assets/advanced-archetypes/alluvial.png`（部署后路径，相对于 skill 根目录）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 展示样本在多个离散属性（如 Tissue → Subtype → Response）之间的流向分布与构成比例；揭示类别交叉模式；≥3 个分类轴时优于堆叠柱图 |
+| **数据形状** | data.frame（各轴分类列 + `Freq` 聚合计数）；经 `table()` 聚合为宽格式，`aes(axis1=, axis2=, axis3=, y=Freq)`；各轴类别须显式 `factor` 锁定水平顺序 |
+| **核心依赖** | `ggalluvial`、`ggplot2`、`figure_setup.R` |
+| **配色规则** | 流带（alluvium）fill 映射到中间分类轴（如 Subtype），颜色取 `nature_pal_anno[seq_along(levels)]`；stratum 用 `grey92` 中性色；≤3 主色原则 |
+| **渲染翻车点** | ① `geom_alluvium(width=W)` 与 `geom_stratum(width=W)` 必须传同一 `W`（默认 1/3），不一致时流带"戳出"矩形块；② ggplot2 ≥3.3 用 `after_stat(stratum)`，旧代码 `stat(stratum)` 在新版报 deprecated 警告或错误；③ `scale_x_discrete(limits=c(...))` 必须显式锁定阶段顺序，省略时按字母序排列，叙事完全改变；④ 各轴因子水平顺序控制 stratum 内堆叠顺序，务必显式 `factor(..., levels=...)`；⑤ 同名类别出现在多轴（如两列都含 "Normal"）会触发 "Some strata appear at multiple axes" 警告，需改名消除歧义；⑥ stratum 过多时 `size=2` 标签重叠，可缩小字号或只标主要类别 |
+| **分析严谨翻车点** | ⑦ **流带宽度=样本计数，不等于概率或因果**——"C1→Responder 流最宽"只反映样本数多，不代表 C1 更可能应答（需看条件比例），更不能解读为 Subtype 导致了 Response（横截面分类，无干预设计）；⑧ **阶段顺序是人为排列，换顺序改变视觉叙事**——同一数据改为 `Subtype → Tissue → Response` 会呈现完全不同"故事"，须在图注说明各轴含义与排列依据，不得暗示因果时序；⑨ **小流（低 n）视觉上易被忽略但可能重要**——罕见亚型的 alluvium 极细，需在图注明确注明绝对 n，必要时补表格，防止临床重要信息被视觉压制 |
+| **参考实现** | `archetypes/flow-alluvial/` |
+
+---
+
+### M. chord 弦图（circlize chordDiagram）
+
+**参考图**：`assets/advanced-archetypes/chord.png`（部署后路径，相对于 skill 根目录）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 展示两两类别间互作强度（细胞间通讯 CellChat/NicheNet 输出、组学间关联频次）；弦宽正比于互作计数；有向/无向均可；适用于细胞通讯 Figure |
+| **数据形状** | 命名方阵（行=发送方，列=接收方，值=互作强度/计数，对角可设 0 排除自互作）；`synth_chord(n, seed)` 返回 n×n Poisson 矩阵示例 |
+| **核心依赖** | `circlize`、`ragg`、`figure_setup.R`；base 图，非 ggplot |
+| **配色规则** | 扇区颜色 `grid.col = nature_pal_anno[1:n]`，名称须与 rownames 对应；弦透明度 0.35 |
+| **渲染翻车点** | ① `circos.clear()` 必须在 `draw_chord()` 开头与结尾各调一次，否则全局状态泄漏导致第二次渲染（PDF）叠加到第一次；② sector label 需 `preAllocateTracks=1` 配合 `circos.trackPlotRegion()` 自定义文本，才能控制 `facing="clockwise"+niceFacing=TRUE`；③ `chordDiagram` 是 base graphics，**不可用 `save_nature()`**，须 `agg_png(...); draw_chord(); dev.off()` 显式设备流程；④ 脚本末尾必须 `unlink("Rplots.pdf")` 清除残留；⑤ 旧版 `annotationTrackHeight`、新版 `direction.type="arrows"` 需搭配 `link.arr.type`，遇 "unused argument" 须核对当前 `?chordDiagram` 文档 |
+| **分析严谨翻车点** | ⑥ **弦宽=互作强度统计推断，不等于已验证的因果互作**——CellChat 等工具输出的通讯概率本质是配体-受体共表达相关性，弦图可视化数值但无法证明信号真正从 A 传到 B，图注须写"潜在互作强度"而非"A 激活 B"；⑦ **有向箭头（directional=1）需数据本身支持方向性**——若原始矩阵是对称的（如皮尔逊相关），强加 `directional=1` 会产生误导性箭头，仅当矩阵代表真正有方向意义（发送方→接收方计数不对称）时才启用；⑧ **对角置 0 须在图注说明**——`diag(m)<-0` 排除自互作连线，若研究问题本身含自分泌（autocrine），须明确注明"自互作未展示"，避免读者误以为无自分泌信号 |
+| **参考实现** | `archetypes/chord-diagram/` |
+
+---
+
+### N. UpSet 集合交集图（UpSetR）
+
+**参考图**：`assets/advanced-archetypes/upset.png`（部署后路径，相对于 skill 根目录）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | ≥4 个集合（多组学 overlap：差异基因×甲基化×CNV×蛋白组等）的交集模式可视化，替代 Venn 图；顶部交集大小柱图+点矩阵+左侧集合大小柱图，清晰展示复杂交集结构 |
+| **数据形状** | 命名列表（各元素为集合成员字符向量），须先 `fromList(sets)` 转二进制 0/1 矩阵（各列=集合，各行=元素），再传入 `UpSetR::upset()` |
+| **核心依赖** | `UpSetR`、`ragg`、`figure_setup.R`；更美替代：`ComplexUpset`（底层全 ggplot2，支持自定义 panel、完整 theme 系统——**本机当前未安装**，投稿级图可 `install.packages("ComplexUpset")` 升级） |
+| **配色规则** | 顶部交集柱用 `nature_seq[5]`；左侧集合大小柱用 `nature_pal_anno[1]`；矩阵点/连线用 `nature_div[1]`；底纹 `grey85` |
+| **渲染翻车点** | ① `fromList()` 不可跳过——直接传命名列表会报 `Error in data[, i]`（无法定位），必须先转二进制矩阵；② `text.scale` 必须为 scalar 或长度恰好 6 的向量（槽位依次：交集大小标题/刻度、集合大小标题/刻度、集合名称、柱顶数字），传错长度会 `subscript out of bounds` 或静默截断；③ `UpSetR::upset()` 返回 grid 对象，脚本模式下不自动绘制——必须 `print(upset(...))` 才能渲染到打开的设备；④ 不可用 `save_nature()`（内部调 `ggsave`，UpSetR 非 ggplot），须 `agg_png(...)` + `print(upset(...))` + `dev.off()`；⑤ 脚本末尾必须 `unlink("Rplots.pdf")`；⑥ `order.by="freq"` 按交集元素数降序（最大交集在左）、`"degree"` 按参与集合数升序，两种排序叙事不同，投稿前须确认与图注一致 |
+| **分析严谨翻车点** | ⑦ **各集合定义阈值必须统一**——若 DEG_up 用 FDR<0.05+\|logFC\|>1 而 Methylated 用 p<0.1，阈值严格程度不同会人为放大/缩小交集，须在图注明确各集合的入选标准；⑧ **大交集不等于生物学显著**——若 DEG_up 有 85 个基因、CNV_gain 有 50 个，在 200 基因池中随机交集期望约 21 个，观察值若未远超期望，overlap 可能只是大集合的必然结果而非真实生物学关联，须补做**超几何检验**（`phyper()`）或 Fisher 精确检验并在图注报 p 值；⑨ **集合来源平台不同须说明并经批次矫正**——DEG 来自 RNA-seq、Methylated 来自 RRBS、CNV 来自 SNP array 若各批次未批次矫正，共同批次效应可能高估 overlap，而不同平台基因覆盖差异可能低估，须注明数据来源并说明是否已矫正 |
+| **参考实现** | `archetypes/upset-sets/` |
+
+---
+
 ## ③ 诚实边界
 
 以下类型图形**代码无法胜任**，不要尝试硬用 R/Python 画：
@@ -235,4 +301,4 @@
 
 ---
 
-*Phase 0 两个 archetype 就绪（A、B）；Phase 1 新增三个（C oncoprint、D circos、E ggtree+heatmap）；Phase 1.5 新增 F 火山图、①·6 设计克制护栏、诚实 caption 约定，B composite 更新为 hero 布局；Phase 2 新增四个单细胞/空间组学 archetype（G UMAP Atlas、H marker dotplot、I 拟时序/slingshot、J 空间 feature 叠图），各含分析严谨翻车点；野心阶梯"单细胞/UMAP"条目更新为 ✅就绪；后续 Phase 追加新条目到「已就绪 Archetype 清单」，更新本文件。*
+*Phase 0 两个 archetype 就绪（A、B）；Phase 1 新增三个（C oncoprint、D circos、E ggtree+heatmap）；Phase 1.5 新增 F 火山图、①·6 设计克制护栏、诚实 caption 约定，B composite 更新为 hero 布局；Phase 2 新增四个单细胞/空间组学 archetype（G UMAP Atlas、H marker dotplot、I 拟时序/slingshot、J 空间 feature 叠图），各含分析严谨翻车点；野心阶梯"单细胞/UMAP"条目更新为 ✅就绪；Phase 3 新增四个关系/网络/集合 archetype（K 富集通路网络 ggraph、L Sankey/alluvial 流向图、M chord 弦图、N UpSet 集合交集图），各含分析严谨翻车点；野心阶梯"富集/通路分析"高级项通路网络更新为 ✅就绪；后续 Phase 追加新条目到「已就绪 Archetype 清单」，更新本文件。*
