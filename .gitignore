@@ -1,0 +1,6 @@
+# 临时/过程文件
+.work/
+scratchpad/
+*.tmp
+.Rhistory
+.RData
