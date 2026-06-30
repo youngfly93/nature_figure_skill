@@ -27,7 +27,8 @@ sub_cols <- nature_group_cols(sv_levs)             # auto from nature_pal_6
 ha <- nature_hm_anno(
   Subtype = d$col_anno$Subtype,
   Stage   = d$col_anno$Stage,
-  Tissue  = d$col_anno$Tissue)
+  Tissue  = d$col_anno$Tissue,
+  col     = list(Subtype = sub_cols))
 
 ht <- nature_heatmap(
   d$mat, name = "Z-score",
