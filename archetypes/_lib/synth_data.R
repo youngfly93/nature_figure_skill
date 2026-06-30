@@ -95,3 +95,40 @@ synth_deg <- function(n = 12000, n_up = 280, n_dn = 260, seed = 42) {
   data.frame(gene = gene, logFC = logFC, adj.P.Val = adjP, sig = sig,
              y = -log10(pmax(adjP, 1e-300)), stringsAsFactors = FALSE)
 }
+
+# —— Phase 2 追加：单细胞 + 空间 ——
+synth_scrna <- function(n_cells = 2000, n_types = 6, n_markers = 4, seed = 11) {
+  set.seed(seed)
+  types <- paste0("CellType", seq_len(n_types))
+  ct <- factor(sample(types, n_cells, TRUE), levels = types)
+  # 每个 celltype 一个 UMAP 簇中心
+  ctr <- matrix(runif(n_types * 2, -8, 8), n_types, 2, dimnames = list(types, c("U1","U2")))
+  emb <- data.frame(
+    UMAP1 = ctr[ct, 1] + rnorm(n_cells, 0, 1.1),
+    UMAP2 = ctr[ct, 2] + rnorm(n_cells, 0, 1.1),
+    celltype = ct,
+    cluster  = factor(as.integer(ct)))
+  # marker 基因：每 celltype n_markers 个，在该型高表达
+  genes <- paste0("M", sprintf("%02d", seq_len(n_types * n_markers)))
+  gmap  <- data.frame(gene = genes,
+                      celltype = factor(rep(types, each = n_markers), levels = types))
+  base <- matrix(rpois(length(genes) * n_cells, 0.4), length(genes), n_cells,
+                 dimnames = list(genes, NULL))
+  for (i in seq_along(genes)) {
+    hit <- ct == gmap$celltype[i]
+    base[i, hit] <- base[i, hit] + rpois(sum(hit), 6)
+  }
+  expr <- log1p(base)                                  # 表达量（log1p 计数）
+  lineage <- as.integer(ct) + rnorm(n_cells, 0, 0.3)   # 连续潜变量（拟时序参考）
+  list(emb = emb, expr = expr, markers = gmap, counts = base, lineage = lineage)
+}
+
+synth_spatial <- function(n_spots = 1500, seed = 12) {
+  set.seed(seed)
+  side <- ceiling(sqrt(n_spots))
+  g <- expand.grid(x = seq_len(side), y = seq_len(side))[seq_len(n_spots), ]
+  # 空间域：按 x 分三带 + 噪声
+  dom <- cut(g$x + rnorm(n_spots, 0, 1.2), breaks = 3, labels = c("Domain1","Domain2","Domain3"))
+  feature <- sin(g$x / side * pi) * 2 + g$y / side + rnorm(n_spots, 0, 0.25)  # 空间梯度
+  data.frame(x = g$x, y = g$y, celltype = factor(dom), feature = feature)
+}

@@ -13,7 +13,7 @@
 | **聚类/降维结构** | PCA 散点（默认颜色） | 带置信椭圆 PCA（ggplot2 stat_ellipse） | **多注释 ComplexHeatmap**（行/列聚类 + 多轨道样本注释，展现亚群结构与生物学意义）✅就绪 |
 | **富集/通路分析** | 条形图（Top 10 条） | dotplot（ggplot2，气泡=基因数，颜色=p） | **通路网络图**（enrichplot::cnetplot / emapplot）⏳预留（Phase 1+，暂无就绪脚本）；或**ridge plot**（enrichplot::ridgeplot，展示全基因集分布）⏳预留（Phase 1+，暂无就绪脚本） |
 | **多组学整合** | 逐个出图拼 PPT | 相关性热图（Hmisc + corrplot） | **复合多面板叙事大图**（表达/生存/通路/基因组四象限，cowplot 拼装，逻辑链完整）✅就绪 |
-| **单细胞/UMAP** | 单色 UMAP 散点 | 分组着色 UMAP（Seurat DimPlot） | **UMAP Atlas 复合图**（细胞类型 + marker 热图 + 差异气泡图多面板，展示生物学结构）⏳预留（Phase 1+，暂无就绪脚本） |
+| **单细胞/UMAP** | 单色 UMAP 散点 | 分组着色 UMAP（Seurat DimPlot） | **UMAP Atlas 复合图**（细胞类型 + marker 热图 + 差异气泡图多面板，展示生物学结构）✅就绪 |
 | **癌症基因组/突变全景** | 突变频率条形图或简单矩阵 | 热图展示突变类型 | **oncoprint 突变全景图**（ComplexHeatmap::oncoPrint，变异类型分层 + 临床注释轨道，Main Figure 常客）✅就绪 |
 | **基因组结构/SV/泛基因组** | 逐染色体条形图 | 分染色体散点/折线 | **基因组圈图**（circlize，CNV/表达/突变密度/结构变异连线多轨道圆形布局）✅就绪 |
 | **系统发育/克隆进化/菌株分型** | 单独进化树或单独热图 | 带分组着色的树（ggtree） | **进化树+热图联排**（ggtree::gheatmap，树结构与 tip 特征矩阵精确对齐）✅就绪 |
@@ -153,6 +153,72 @@
 
 ---
 
+---
+
+### G. 单细胞 UMAP Atlas 复合图（ggplot2 + ggrastr + patchwork）
+
+**参考图**：`assets/advanced-archetypes/sc_umap.png`（部署后路径，相对于 skill 根目录）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | scRNA/snRNA 降维后，一图展示细胞类型图谱 + 关键 marker 的表达分布；单细胞 Main Figure 标配 |
+| **数据形状** | embedding 坐标（UMAP1/UMAP2）+ celltype/cluster 注释 + marker 基因 × 细胞表达矩阵 |
+| **核心依赖** | `ggplot2`、`ggrastr`（栅格化大点云）、`patchwork`、`figure_setup.R` |
+| **配色规则** | celltype 离散用 `nature_pal_anno`；表达连续用 grey→蓝→红渐变（取自 theme）；0 表达用灰色，高表达才上色 |
+| **渲染翻车点** | ① 上千点不栅格化 → PDF/SVG 巨大、卡死 → `ggrastr::rasterise(..., dpi=300)`；② UMAP 不 `coord_fixed()` → 簇形变形；③ 用图例认 celltype → 改直接标签（簇中心 `geom_text`），省眼动；④ feature plot 表达 0 用亮色 → 0 用灰、高表达才上色 |
+| **分析严谨翻车点** | ⑤ **UMAP 距离不可定量解读**——簇间距离/密度是非线性嵌入产物，不能说"A 比 B 更接近 C"，该说法无数学依据；⑥ **marker 表达受测序深度/dropout 影响**——"未检出"≠"不表达"，应说明是否做了归一化/imputation，不得凭 UMAP 颜色断言基因沉默；⑦ **聚类数依赖分辨率参数**——celltype 标注须有 marker 证据支撑，不得把算法簇直接等同于生物学细胞类型 |
+| **参考实现** | `archetypes/sc-umap-atlas/` |
+
+---
+
+### H. 单细胞 marker dotplot（ggplot2 双编码气泡图）
+
+**参考图**：`assets/advanced-archetypes/sc_dotplot.png`（部署后路径，相对于 skill 根目录）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 展示一组基因（marker）在各细胞类型的表达特异性；点大小=该类型表达该基因的细胞比例（pct），颜色=基因均值 z-score；单细胞注释 Figure 标配 |
+| **数据形状** | 聚合后的 data.frame（celltype × gene，含 pct_expressing 与 mean_expr）；celltype 须显式 factor 控制顺序 |
+| **核心依赖** | `ggplot2`、`figure_setup.R`（`rev(nature_div)` 配色） |
+| **配色规则** | z-score 色谱取 `rev(nature_div)`（红→高/蓝→低），与库内其他热图色向一致；≤3 主色原则 |
+| **渲染翻车点** | ① 点大小（pct）与颜色（z-score）须独立编码不同变量，不得绑定同一列；② 须按基因内跨 celltype z-score 着色，原始均值会被高表达基因吃掉动态范围；③ celltype 因子顺序若依赖字母序，对角块结构会被打乱；④ `axis.text.y` 字号 ≥ 4.5 pt，24 基因图内否则不可读；⑤ 须套 `theme_nature()` 保证白底（默认 `theme_classic()` 不达标） |
+| **分析严谨翻车点** | ⑥ **pct 与 mean 双指标必须结合读**——高 pct + 低 mean 可能是本底表达而非真 marker；低 pct + 高 mean 可能是亚群特异，仅凭颜色或点大小单维判断会误导结论；⑦ **z-score 反映"相对特异"而非"绝对高表达"**——若某基因全 celltype 均低表达，z-score 仍会出现红色峰值（相对最高列），须同时注明绝对均值范围避免将背景噪音误读为特异高表达；⑧ **marker 选择的循环论证风险**——若 marker 来源于对同一批数据做差异分析，再用 dotplot 展示等于在训练集上评估，须用独立数据集、文献已知 marker 或蛋白层面验证打破循环 |
+| **参考实现** | `archetypes/sc-marker-dotplot/` |
+
+---
+
+### I. 单细胞拟时序轨迹图（slingshot + ggplot2 + ggrastr）
+
+**参考图**：`assets/advanced-archetypes/sc_trajectory.png`（部署后路径，相对于 skill 根目录）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | scRNA 数据中推断细胞分化/状态转变的发育轨迹；UMAP 散点按拟时序连续着色，叠加 slingshot 拟合的轨迹曲线 |
+| **数据形状** | UMAP embedding（UMAP1/UMAP2）+ cluster 标签 + slingshot 拟合的 pseudotime 值 + 曲线坐标（`slingCurves()` 返回矩阵） |
+| **核心依赖** | `slingshot`（Bioconductor，Street et al. 2018）、`ggplot2`、`ggrastr`、`figure_setup.R`（monocle3 因系统缺 GDAL/GEOS 无法安装，本库采用 slingshot 兜底） |
+| **配色规则** | pseudotime 连续色用 `nature_seq`（淡蓝→深蓝）；0 = 起点/早期，最大值 = 终点 |
+| **渲染翻车点** | ① `start.clus` 须与聚类因子水平完全一致（字符串），传整数会静默错误；② `slingCurves()[[1]]$s` 返回列名是位置索引而非 `UMAP1/UMAP2`，须手动 `colnames(crv_df) <- c("UMAP1","UMAP2")` 再传 `geom_path()`；③ 点云用 `ggrastr::rasterise(dpi=300)`，轨迹曲线保持 `geom_path()`（矢量）不栅格化；④ UMAP 须 `coord_fixed()` 否则簇形失真、轨迹方向误导；⑤ 须 `theme_nature()` 保证白底 |
+| **分析严谨翻车点** | ⑦ **拟时序是模型推断的"假定"轨迹，不是真实时间**——pseudotime 是算法基于细胞在降维空间分布拟合的概率/几何顺序，不应解读为"某细胞在第 X 天"；⑧ **轨迹方向完全依赖 root 选择**——`start.clus` 是研究者主观先验，root 选错则整个轨迹方向倒置，须用已知时序标记基因或分裂指数进行验证；⑨ **拓扑结论应稳健于工具选择**——slingshot（最小生成树+主曲线）与 monocle3（DDRTree/principal graph）算法不同，分支数量和走向可能差异；若得出"A→B→C"分化轴结论，须说明工具局限或在两种工具下均验证；⑩ **pseudotime 不可跨批次/跨实验比较**——不同实验批次的 pseudotime 值只代表相对排序，须归一化对齐后才能纵向比较 |
+| **参考实现** | `archetypes/sc-trajectory/` |
+
+---
+
+### J. 空间组学 feature 叠图（ggplot2 + ggrastr + patchwork 双面板）
+
+**参考图**：`assets/advanced-archetypes/spatial.png`（部署后路径，相对于 skill 根目录）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 空间转录组（Visium/Slide-seq 等）数据，一图展示空间域（cell type annotation）与连续 feature 梯度（基因表达/信号通路活性）的空间分布 |
+| **数据形状** | data.frame（x, y 空间坐标 + celltype [factor] + feature [numeric]）；Visium 每 spot 1–10 个细胞混合 |
+| **核心依赖** | `ggplot2`、`ggrastr`、`patchwork`、`figure_setup.R`（`viridis/magma` 连续色谱 + `nature_pal_anno` 离散域色） |
+| **配色规则** | 域（celltype）用 `scale_colour_manual(nature_pal_anno)`（离散）；feature 梯度用 `scale_colour_viridis_c`（连续）；两者不可共用同一色谱，否则读者无法区分域归属与梯度高低 |
+| **渲染翻车点** | ① 必须 `coord_fixed()` 否则空间 x/y 比例失真，域形状与真实切片不符；② 1500+ spot 必须 `ggrastr::rasterise(dpi=300)` 否则 PDF 体积超 50 MB 且卡顿；③ 离散域与连续 feature 分别用 `scale_colour_manual` / `scale_colour_viridis_c`，不得共用；④ 注意 `ggrastr` 版本差异：旧版函数名为 `rasterize()`（无 s），新版为 `rasterise()`；⑤ `figure_setup.R` 路径写错会导致灰底 QA 失败 |
+| **分析严谨翻车点** | ⑥ **空间自相关——相邻 spot 不独立**——标准 t-test/线性回归假设观测值独立，但空间组学相邻 spot 表达高度相关（Moran's I 常 > 0.3），直接用非空间模型检验 feature 与域的关联会显著膨胀 I 类错误，须用 NNSVG、spatialDE 或 SPARK 等空间统计模型；⑦ **spot 多细胞混合（非单细胞分辨率）**——Visium spot 直径 ~55 µm，覆盖 1–10 个细胞，"域"标签实为混合信号，不得将 spot 域等同于纯净单细胞类型注释，建议结合 RCTD/SPOTlight/cell2location 解卷积并注明是"spot-level domain"而非"cell-level annotation"；⑧ **切片伪影与批次效应**——不同切片/捕获区域间存在库深度、RNA 降解、背景荧光等技术批次，易被误读为生物学 feature 梯度，多切片整合须 harmony/Seurat 批次校正并在图注中明确标注是否已批次校正 |
+| **参考实现** | `archetypes/spatial-feature/` |
+
+---
+
 ## ③ 诚实边界
 
 以下类型图形**代码无法胜任**，不要尝试硬用 R/Python 画：
@@ -169,4 +235,4 @@
 
 ---
 
-*Phase 0 两个 archetype 就绪（A、B）；Phase 1 新增三个（C oncoprint、D circos、E ggtree+heatmap）；Phase 1.5 新增 F 火山图、①·6 设计克制护栏、诚实 caption 约定，B composite 更新为 hero 布局；后续 Phase 追加新条目到「已就绪 Archetype 清单」，更新本文件。*
+*Phase 0 两个 archetype 就绪（A、B）；Phase 1 新增三个（C oncoprint、D circos、E ggtree+heatmap）；Phase 1.5 新增 F 火山图、①·6 设计克制护栏、诚实 caption 约定，B composite 更新为 hero 布局；Phase 2 新增四个单细胞/空间组学 archetype（G UMAP Atlas、H marker dotplot、I 拟时序/slingshot、J 空间 feature 叠图），各含分析严谨翻车点；野心阶梯"单细胞/UMAP"条目更新为 ✅就绪；后续 Phase 追加新条目到「已就绪 Archetype 清单」，更新本文件。*
