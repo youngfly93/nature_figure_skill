@@ -47,7 +47,7 @@ p <- ggraph(tg, layout = "fr") +
   scale_size_continuous(range = c(1.5, 8), name = "Gene count", guide = "none") +
   scale_shape_manual(values = c(Pathway = 16, Gene = 16), guide = "none") +
   scale_colour_gradientn(
-    colours  = rev(nature_seq[-1]),
+    colours  = nature_seq[-1],
     na.value = "grey75",
     name     = expression(-log[10]~italic(p)[adj])
   ) +

@@ -18,7 +18,7 @@ nw <- synth_network()   # list(edges=data.frame(from=term,to=gene), terms=data.f
 |------------|----------------------------------------------|
 | 节点类型   | Pathway（大，按基因数sizing，按 -log10 p.adjust 着色）+ Gene（小灰）|
 | 边         | 细灰（edge_width=0.25），半透明               |
-| 颜色       | `rev(nature_seq[-1])`（深蓝→浅蓝，深=显著）  |
+| 颜色       | `nature_seq[-1]`（浅蓝→深蓝，**深蓝 = 更显著**）|
 | 布局       | Fruchterman-Reingold（`layout="fr"`）        |
 | 标签       | 仅通路节点标注，`repel=TRUE` 防重叠          |
 | 尺寸       | 150×130 mm，300 dpi PNG + PDF                |
