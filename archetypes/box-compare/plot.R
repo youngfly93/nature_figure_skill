@@ -59,9 +59,9 @@ p <- ggpubr::ggboxplot(
     caption = paste(
       "Synthetic data only — not real results. set.seed(32); n = 160 (40/group).",
       "Pairwise: Wilcoxon rank-sum vs Ctrl (no multiplicity correction shown).",
-      "Global: Kruskal-Wallis. * p<0.05; ** p<0.01; *** p<0.001; ns p≥0.05.",
+      "Global: Kruskal-Wallis. ns p>=0.05; * p<0.05; ** p<0.01; *** p<0.001; **** p<0.0001.",
       "Colour: ggsci npg palette (via ggpubr).",
-      sep = " "
+      sep = "\n"
     )
   ) +
   theme_nature() +
@@ -72,5 +72,5 @@ p <- ggpubr::ggboxplot(
   )
 
 # ── Export ────────────────────────────────────────────────────────────────────
-save_nature(p, file.path(out, "ref"), width_mm = 120, height_mm = 110)
+save_nature(p, file.path(out, "ref"), width_mm = 120, height_mm = 120)
 cat("done:", file.path(out, "ref.png"), "\n")
