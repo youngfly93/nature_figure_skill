@@ -9,13 +9,17 @@
 | 分析场景 | 基础（能用但浪费） | 中级（合格） | **高级（优先目标）** |
 |---|---|---|---|
 | **两组差异表达** | 分组柱状图（均值±SD） | 带统计标注箱线图（ggpubr）✅就绪 | **多注释差异热图**（ComplexHeatmap，带样本亚型/分期注释轨道）✅就绪；或**带注释火山图**（ggplot2+ggrepel，ggsci NPG 配色，FDR 阈值线 + 关键基因标注）✅就绪 |
-| **生存分析** | 单条 KM 曲线 | 分层 KM + log-rank p 值（survminer） | **多组学复合叙事大图**（KM + 热图 + 富集 + PCA 拼版，patchwork hero 布局，故事完整）✅就绪；或 **多变量 Cox 森林图**（nature_forest，HR+95%CI 临床 Main 常客）✅就绪 |
+| **生存分析** | 单条 KM 曲线 | **分层 KM + log-rank + 风险表**（clinical-km，复用 nature_km）✅就绪 | **多组学复合叙事大图**（KM + 热图 + 富集 + PCA 拼版，patchwork hero 布局，故事完整）✅就绪；或 **多变量 Cox 森林图**（nature_forest，HR+95%CI 临床 Main 常客）✅就绪 |
+| **临床预测模型** | 一句"HR 显著" | 单条 ROC / 单表 | **列线图 nomogram**（rms，各变量打分尺 → 1/3/5 年生存预测，须配 calibration）✅就绪；或 **多模型 ROC 对比**（pROC，AUC+DeLong CI，模型区分度对比）✅就绪 |
+| **免疫微环境/去卷积** | 单细胞型柱状图 | 分组箱线比较 | **免疫浸润组成图**（堆叠占比条 + 关键 TME 细胞型组间比较双面板，immune-infiltration）✅就绪 |
 | **聚类/降维结构** | PCA 散点（默认颜色） | 带置信椭圆 PCA（ggplot2 stat_ellipse） | **多注释 ComplexHeatmap**（行/列聚类 + 多轨道样本注释，展现亚群结构与生物学意义）✅就绪 |
 | **富集/通路分析** | 条形图（Top 10 条） | dotplot（ggplot2，气泡=基因数，颜色=p） | **通路网络图**（ggraph 二部图，cnetplot 风格）✅就绪；canonical 替代：enrichplot::cnetplot / emapplot；或**ridge plot**（enrichplot::ridgeplot，展示全基因集分布）⏳预留（Phase 1+，暂无就绪脚本） |
 | **多组学整合** | 逐个出图拼 PPT | 相关性热图（Hmisc + corrplot） | **复合多面板叙事大图**（表达/生存/通路/基因组四象限，cowplot 拼装，逻辑链完整）✅就绪 |
 | **单细胞/UMAP** | 单色 UMAP 散点 | 分组着色 UMAP（Seurat DimPlot） | **UMAP Atlas 复合图**（细胞类型 + marker 热图 + 差异气泡图多面板，展示生物学结构）✅就绪 |
 | **癌症基因组/突变全景** | 突变频率条形图或简单矩阵 | 热图展示突变类型 | **oncoprint 突变全景图**（ComplexHeatmap::oncoPrint，变异类型分层 + 临床注释轨道，Main Figure 常客）✅就绪 |
+| **突变过程/signature** | 突变类型计数柱 | 6 类替换型堆叠柱 | **SBS-96 突变 signature**（96 通道 COSMIC 谱，突变过程分解，mut-signature）✅就绪 |
 | **基因组结构/SV/泛基因组** | 逐染色体条形图 | 分染色体散点/折线 | **基因组圈图**（circlize，CNV/表达/突变密度/结构变异连线多轨道圆形布局）✅就绪 |
+| **拷贝数 landscape（队列）** | 逐染色体 CNV 柱 | 单样本 CNV 折线 | **全基因组 CNV 频率谱**（GISTIC 样，gain 上/loss 下线性谱，cnv-gistic）✅就绪 |
 | **系统发育/克隆进化/菌株分型** | 单独进化树或单独热图 | 带分组着色的树（ggtree） | **进化树+热图联排**（ggtree::gheatmap，树结构与 tip 特征矩阵精确对齐）✅就绪 |
 
 ✅就绪=本库已有可跑参考脚本；⏳预留=后续 Phase 补，遇到时应明确告知用户尚无现成模板、按通用原则手写或走 nature_theme.R 基础函数。
@@ -317,6 +321,90 @@
 
 ---
 
+### Q. KM 生存曲线 + number-at-risk 表（nature_km）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 分组/biomarker 二分后的生存曲线，展示各组随时间生存概率差异 + log-rank/Cox + HR + 底部风险表；临床癌症报告第一高频图，与 O 森林图（讲"哪些因素"）互补讲"生存本体" |
+| **数据形状** | data.frame（time, status[1=事件/0=删失], group 或连续 value）；`synth_km(seed=51)` 返回 biomarker High/Low 示例 |
+| **核心依赖** | `nature_km()`（nature_theme.R 内置）、`survival`、`patchwork`（风险表拼装） |
+| **配色规则** | High/Low 语义色；多组用 `nature_group_cols(levels)`；删失点 `shape=3` 竖线 |
+| **渲染翻车点** | ① 删失标记必须在，否则"曲线走平"被误读为无退出；② >2 组无 HR（`nature_km` 仅 2 组算 Cox/HR）；③ 曲线与风险表 x 刻度须对齐（内部同 `breaks`）；④ 返回 patchwork，加 caption 用 `+ plot_annotation()` 非 `+ labs()` |
+| **分析严谨翻车点** | ⑤ **log-rank 只反映关联，非独立预后**——主张独立预后须多变量 Cox；⑥ **分组切点不能数据驱动后不报**——median/maxstat 最优切点抬高假阳性，切点方法与阈值必须写明并校正；⑦ **随访不足/informative censoring**——末端曲线由极少数决定、因病重退出偏倚估计，须报中位随访时间与删失比例 |
+| **参考实现** | `archetypes/clinical-km/` |
+
+---
+
+### R. 列线图 nomogram（rms::cph 多变量 Cox 预测）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 把多变量 Cox/logistic 模型转成可手动累加的"打分尺"，读者据各变量得分 → Total Points → 读 1/3/5 年生存概率；临床预测模型 Main Figure |
+| **数据形状** | 生存结局（time, status）+ 连续/分类协变量 data.frame；`synth_nomogram_cohort(seed=52)`（Age/Stage/Grade/Biomarker） |
+| **核心依赖** | `rms`（datadist + cph + nomogram）、`ragg`；**base graphics 非 ggplot** |
+| **配色规则** | 以清晰刻度为先，`col.grid` 浅灰参考网格；base 图设 `par(family=NATURE_FONT)` |
+| **渲染翻车点** | ① **必须先 `datadist` + `options(datadist=)`** 否则报错找不到分布；② `cph(x=T,y=T,surv=T)` 保存设计矩阵供 Survival/calibrate；③ base 图**不用 save_nature**，显式 `agg_png/cairo_pdf`；④ `fun.at` 超出可达概率范围会被截断属正常；⑤ 末尾 `unlink("Rplots.pdf")` |
+| **分析严谨翻车点** | ⑥ **nomogram 不能单独出——必须配 calibration + C-index**（`rms::calibrate` bootstrap 校准曲线 + `validate` optimism-corrected C-index），只画预测尺不报区分度/校准是高频拒稿点；⑦ **过拟合**：EPV<10 时点估计不稳，须 bootstrap 报校正后 C-index；⑧ **外部验证缺失**：内部 bootstrap ≠ 外部队列；⑨ **连续变量线性假设**：非线性关系须 `rcs()` 样条 |
+| **参考实现** | `archetypes/clinical-nomogram/` |
+
+---
+
+### S. SBS-96 突变 signature（COSMIC 96 通道谱）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 展示样本/队列的单碱基替换突变谱（6 替换型 × 16 三核苷酸上下文 = 96 通道），用于 COSMIC signature 分解、突变过程推断（SBS1 老化/SBS4 吸烟等）；癌症基因组 Figure |
+| **数据形状** | 96 行 data.frame（substitution, context, fraction），须为 **COSMIC 顺序**；`synth_sbs96(seed=53)` 生成（真实数据换 MutationalPatterns/maftools 的 96 向量） |
+| **核心依赖** | `ggplot2`（原生实现，6 分面 + 官方色码，无重 Bioc 依赖，便于移植） |
+| **配色规则** | **领域约定优先于 ≤3 色通则**：COSMIC 官方 6 色（C>A 蓝/C>G 黑/C>T 红/T>A 灰/T>C 绿/T>G 粉），改色则不可辨认——与 circos 多轨、oncoprint 变异类型同为合法例外 |
+| **渲染翻车点** | ① **96 通道须 COSMIC 顺序**（6 替换型内按三核苷酸、5' 变化最慢），错序则与文献图/分解对不上；② x 轴 96 标签太密→只显三核苷酸（`mono` 字体 size≈2.4）靠 strip 标替换型；③ 纯 ggplot 无法按分面上不同色 strip 顶条，要完全复刻用 `ggh4x::strip_themed` 或 `MutationalPatterns::plot_96_profile`；④ 多样本比较用 fraction 归一化，别用原始计数 |
+| **分析严谨翻车点** | ⑤ **signature ≠ 病因**——"检出 SBS4"≠"吸烟"，措辞用 consistent with；⑥ **低突变负荷样本谱不可信**——突变数<数十时噪声极大，须报负荷、过滤；⑦ **de novo 提取 vs refit 是两回事**——k 选择、cosine 阈值须报告，别把 refit 说成"发现新 signature"；⑧ **FFPE/氧化 artifact**（C>T/G>T）污染谱，须说明是否过滤 |
+| **参考实现** | `archetypes/mut-signature/` |
+
+---
+
+### T. 免疫浸润组成（堆叠占比 + 组间比较）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 免疫去卷积（CIBERSORT/xCell/EPIC/quanTIseq）结果，一图展示各样本免疫细胞占比构成 + 关键 TME 细胞型组间差异；肿瘤微环境 Figure |
+| **数据形状** | 样本×细胞型占比矩阵（**行和=1**）+ 分组向量；`synth_immune(seed=54)` 返回 Tumor/Normal 10 细胞型示例 |
+| **核心依赖** | `ggplot2`、`patchwork`（双面板）、`ggpubr`（组间 Wilcoxon 标注） |
+| **配色规则** | **领域必需 >3 色**（10~22 细胞型）：`colorRampPalette(nature_pal_anno)` 插值定性色板，固定顺序跨图同色——与 alluvial 多类别同为合法例外 |
+| **渲染翻车点** | ① 占比须归一化（行和=1），否则堆叠条高低不齐；② 组内按某关键细胞型占比排序更可读；③ 10+ 色相邻块须拉开、固定顺序；④ p 值标注用 `scale_y_continuous(expand=expansion(mult=c(.05,.15)))` 留上方空间防压须线/离群点 |
+| **分析严谨翻车点** | ⑤ **relative mode 占比是"相对比例"非绝对细胞数**——某型升高可能是别的降了，须说明 relative/absolute mode；⑥ **检验匹配设计**——同患者配对样本用配对 Wilcoxon，多细胞型多组须 `p.adjust`（BH）；⑦ **去卷积依赖 signature matrix 与平台**——LM22 基于外周血用于实体瘤可能不准，方法间差异大，关键结论多方法交叉/单细胞验证；⑧ **批次效应**——不同深度/批次占比不可直接比 |
+| **参考实现** | `archetypes/immune-infiltration/` |
+
+---
+
+### U. 多模型 ROC 曲线 + AUC（pROC）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 同图叠加多个诊断/预后模型的 ROC，图例标各自 AUC+95% CI，对比模型区分能力；诊断标志物/预测模型 Figure |
+| **数据形状** | data.frame（label[0/1] + 各模型预测分数列）；`synth_roc(seed=55)` 返回强/中/弱三模型示例 |
+| **核心依赖** | `pROC`（roc + ci.auc DeLong）、`ggplot2`、`ggsci`（NPG ≤3 主色） |
+| **配色规则** | ≤3 模型用 ggsci NPG；对角随机基线虚灰线；图例内嵌右下 |
+| **渲染翻车点** | ① **`direction="<"` 显式指定**方向，避免 pROC 自动翻转出 AUC<0.5；② 曲线按 (model, fpr, tpr) 排序否则 geom_path 乱连；③ `coord_equal()` 保 1:1 正方形；④ 对角线必须在（随机基线）；⑤ AUC 须带 CI，不能只报点值 |
+| **分析严谨翻车点** | ⑥ **训练集 ROC 虚高**——须交叉验证/独立测试/bootstrap 校正，注明来自训练还是验证；⑦ **AUC 高 ≠ 临床有用**——类别不平衡时掩盖低 PPV，须并报 敏感度/特异度/PPV，罕见事件补 PR 曲线；⑧ **模型比较须配对检验**（`roc.test` DeLong），不能仅凭 AUC 数值或 CI 是否重叠；⑨ **阈值须预先声明**——同数据选 Youden 又评估=数据窥探 |
+| **参考实现** | `archetypes/roc-multi/` |
+
+---
+
+### V. 全基因组 CNV 频率谱（GISTIC 样）
+
+| 项目 | 详情 |
+|---|---|
+| **何时用** | 沿基因组线性坐标展示队列中各位点的扩增频率（红上）/缺失频率（蓝下），看哪些染色体臂/区段反复改变；癌症 CNV landscape。与 D 圈图（单样本多轨圆形）互补 |
+| **数据形状** | data.frame（chr, bin/位置, gain, loss[频率 0–1]）；`synth_cnv_freq(seed=56)` 生成（真实数据换 GISTIC2 的 amplification/deletion frequency 或 G-score） |
+| **核心依赖** | `ggplot2`（原生实现，累积坐标 + 交替底带 + 边界线，无重依赖） |
+| **配色规则** | gain 红 / loss 蓝（`nature_sig_col` Up/Down），2 色符合 ≤3 通则；奇数染色体浅灰底带 |
+| **渲染翻车点** | ① 染色体 offset/cumsum/center 三者须一致，错位则标签飘；② **loss 须取负**（`freq=-loss`）向下画，否则失去 gain/loss 对称语义；③ 下半轴用 `labels=percent(abs(v))` 显正百分比；④ `geom_col(width=1)` 紧贴不留缝 |
+| **分析严谨翻车点** | ⑤ **须先 purity/ploidy 校正**——未校正拷贝数受肿瘤纯度稀释，跨样本频率系统偏差，须说明是否 ABSOLUTE/校正；⑥ **频率 ≠ GISTIC 显著峰**——G-score/q 值已校正基因组长度与背景，只画频率别称"significant peak"（那是 GISTIC 统计结论）；⑦ **focal vs arm-level 分清**——focal 高幅峰更可能含 driver；⑧ **参考基因组版本**（hg19/hg38）须与注释一致 |
+| **参考实现** | `archetypes/cnv-gistic/` |
+
+---
+
 ## ③ 诚实边界
 
 以下类型图形**代码无法胜任**，不要尝试硬用 R/Python 画：
@@ -333,4 +421,4 @@
 
 ---
 
-*Phase 0 两个 archetype 就绪（A、B）；Phase 1 新增三个（C oncoprint、D circos、E ggtree+heatmap）；Phase 1.5 新增 F 火山图、①·6 设计克制护栏、诚实 caption 约定，B composite 更新为 hero 布局；Phase 2 新增四个单细胞/空间组学 archetype（G UMAP Atlas、H marker dotplot、I 拟时序/slingshot、J 空间 feature 叠图），各含分析严谨翻车点；野心阶梯"单细胞/UMAP"条目更新为 ✅就绪；Phase 3 新增四个关系/网络/集合 archetype（K 富集通路网络 ggraph、L Sankey/alluvial 流向图、M chord 弦图、N UpSet 集合交集图），各含分析严谨翻车点；野心阶梯"富集/通路分析"高级项通路网络更新为 ✅就绪；后续 Phase 追加新条目到「已就绪 Archetype 清单」，更新本文件。Phase 4 新增两个 clinical archetype（O 多变量 Cox 森林图 nature_forest、P ggpubr 带*箱线 stat_compare_means），各含分析严谨翻车点；阶梯"两组差异/生存分析"相应项标 ✅就绪；ggsci 期刊配色已并入 nature_theme.R（nature_journal_pal/scale_*_journal）。*
+*Phase 0 两个 archetype 就绪（A、B）；Phase 1 新增三个（C oncoprint、D circos、E ggtree+heatmap）；Phase 1.5 新增 F 火山图、①·6 设计克制护栏、诚实 caption 约定，B composite 更新为 hero 布局；Phase 2 新增四个单细胞/空间组学 archetype（G UMAP Atlas、H marker dotplot、I 拟时序/slingshot、J 空间 feature 叠图），各含分析严谨翻车点；野心阶梯"单细胞/UMAP"条目更新为 ✅就绪；Phase 3 新增四个关系/网络/集合 archetype（K 富集通路网络 ggraph、L Sankey/alluvial 流向图、M chord 弦图、N UpSet 集合交集图），各含分析严谨翻车点；野心阶梯"富集/通路分析"高级项通路网络更新为 ✅就绪；后续 Phase 追加新条目到「已就绪 Archetype 清单」，更新本文件。Phase 4 新增两个 clinical archetype（O 多变量 Cox 森林图 nature_forest、P ggpubr 带*箱线 stat_compare_means），各含分析严谨翻车点；阶梯"两组差异/生存分析"相应项标 ✅就绪；ggsci 期刊配色已并入 nature_theme.R（nature_journal_pal/scale_*_journal）。Phase 5 新增六个临床/基因组高频 archetype（Q KM 生存曲线+风险表 nature_km、R nomogram 列线图 rms、S SBS-96 突变 signature、T 免疫浸润组成、U 多模型 ROC pROC、V 全基因组 CNV 频率谱 GISTIC 样），各含分析严谨翻车点；阶梯新增"临床预测模型/免疫微环境/突变过程/拷贝数 landscape"四场景行，"生存分析"中级项（分层 KM+风险表）标 ✅就绪；S 与 T 显式声明"领域色码/维度决定 >3 色"为覆盖 ≤3 色通则的合法例外；库共 22 个 archetype。*

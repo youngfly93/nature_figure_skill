@@ -198,3 +198,112 @@ synth_box <- function(n = 160, seed = 32) {
   value <- as.numeric(base) + rnorm(n, 0, 0.8)
   data.frame(group = group, value = value)
 }
+
+# —— Phase 5 追加：临床/基因组高频图（KM / nomogram / SBS-96 / 免疫浸润 / ROC / CNV 频率谱）——
+
+# KM 生存：biomarker 中位分组 High/Low，清晰分离 + 右删失（能出显著 log-rank + HR）
+synth_km <- function(n = 220, seed = 51) {
+  set.seed(seed)
+  score <- rnorm(n)
+  grp   <- factor(ifelse(score > stats::median(score), "High", "Low"), levels = c("Low", "High"))
+  rate  <- ifelse(grp == "High", 0.045, 0.018)   # High biomarker → 高风险 → 生存短
+  ttime <- rexp(n, rate)                          # 真事件时间
+  cens  <- rexp(n, 0.010)                         # 随机删失
+  time  <- pmin(ttime, cens)
+  status <- as.integer(ttime <= cens)             # 1=事件, 0=删失
+  cap <- 60                                        # 随访上限（月）→ 超出即行政删失
+  status[time > cap] <- 0
+  time <- pmin(time, cap)
+  data.frame(time = round(time, 1), status = status, group = grp)
+}
+
+# nomogram 队列：生存结局 + 4 个协变量（连续 Age/Biomarker + 有序 Stage + 二分 Grade）
+synth_nomogram_cohort <- function(n = 300, seed = 52) {
+  set.seed(seed)
+  Age       <- round(rnorm(n, 60, 10))
+  Stage     <- factor(sample(c("I","II","III","IV"), n, TRUE, prob = c(.30, .30, .25, .15)),
+                      levels = c("I","II","III","IV"))
+  Grade     <- factor(sample(c("Low","High"), n, TRUE, prob = c(.55, .45)), levels = c("Low","High"))
+  Biomarker <- round(rnorm(n, 5, 2), 2)
+  lp <- 0.03 * (Age - 60) +
+        c(I = 0, II = 0.4, III = 0.9, IV = 1.5)[as.character(Stage)] +
+        c(Low = 0, High = 0.6)[as.character(Grade)] +
+        0.12 * (Biomarker - 5)
+  ttime  <- rexp(n, 0.02 * exp(lp))
+  cens   <- rexp(n, 0.012)
+  cap    <- 60
+  time   <- pmin(ttime, cens, cap)
+  status <- as.integer(ttime <= pmin(cens, cap))
+  data.frame(time = round(time, 1), status = status,
+             Age = Age, Stage = Stage, Grade = Grade, Biomarker = Biomarker)
+}
+
+# SBS-96 突变 signature：COSMIC 顺序（6 替换型 × 16 三核苷酸上下文），注入 C>T@NpCpG（SBS1 样）+ C>A 成分
+synth_sbs96 <- function(seed = 53) {
+  set.seed(seed)
+  subs  <- c("C>A", "C>G", "C>T", "T>A", "T>C", "T>G")
+  bases <- c("A", "C", "G", "T")
+  rows <- do.call(rbind, lapply(subs, function(s) {
+    ref <- substr(s, 1, 1)
+    ctx <- expand.grid(three = bases, five = bases, KEEP.OUT.ATTRS = FALSE)  # 5' 变化最慢→COSMIC 顺序
+    data.frame(substitution = s,
+               context = paste0(ctx$five, "[", s, "]", ctx$three),
+               tri     = paste0(ctx$five, ref, ctx$three),
+               stringsAsFactors = FALSE)
+  }))
+  base <- rexp(96, 8)
+  isCT <- rows$substitution == "C>T"; isCA <- rows$substitution == "C>A"
+  base[isCT] <- base[isCT] + rexp(sum(isCT), 2.5)
+  base[isCA] <- base[isCA] + rexp(sum(isCA), 5)
+  spike <- isCT & substr(rows$tri, 3, 3) == "G"          # NpCpG（SBS1 标志）
+  base[spike] <- base[spike] + rexp(sum(spike), 1.2)
+  rows$fraction     <- base / sum(base)
+  rows$substitution <- factor(rows$substitution, levels = subs)
+  rows$context      <- factor(rows$context, levels = rows$context)  # 锁 96 通道顺序
+  rows
+}
+
+# 免疫浸润：CIBERSORT 样细胞占比矩阵（行和=1）+ Tumor/Normal 分组（Tumor 富 Treg/M2，Normal 富 CD8/M1）
+synth_immune <- function(n_per = 30, seed = 54) {
+  set.seed(seed)
+  cells   <- c("CD8 T","CD4 T","Treg","B cell","NK",
+               "Macro M1","Macro M2","Dendritic","Neutrophil","Mast")
+  groups  <- rep(c("Tumor","Normal"), each = n_per)
+  n       <- length(groups)
+  sh_tum  <- c(2.0, 3.0, 2.5, 2.0, 1.5, 1.2, 3.5, 1.5, 1.5, 1.0)  # 肿瘤：Treg/M2 高
+  sh_nrm  <- c(3.5, 3.0, 1.2, 2.5, 2.2, 2.5, 1.5, 1.8, 1.2, 1.0)  # 正常：CD8/M1 高
+  mat <- t(vapply(seq_len(n), function(i) {
+    g <- rgamma(length(cells), shape = if (groups[i] == "Tumor") sh_tum else sh_nrm, rate = 1)
+    g / sum(g)
+  }, numeric(length(cells))))
+  colnames(mat) <- cells
+  rownames(mat) <- paste0(ifelse(groups == "Tumor", "T", "N"),
+                          sprintf("%02d", ave(seq_len(n), groups, FUN = seq_along)))
+  list(fractions = mat, group = factor(groups, levels = c("Tumor","Normal")), cells = cells)
+}
+
+# ROC：真实标签 + 三个强弱不同模型的预测分数（强/中/弱分离）
+synth_roc <- function(n = 300, seed = 55) {
+  set.seed(seed)
+  label <- rbinom(n, 1, 0.45)
+  data.frame(
+    label                    = label,
+    `Model A (genomic)`      = plogis(rnorm(n, 1.6 * label, 1)),
+    `Model B (clinical)`     = plogis(rnorm(n, 0.9 * label, 1)),
+    `Model C (single gene)`  = plogis(rnorm(n, 0.4 * label, 1)),
+    check.names = FALSE)
+}
+
+# CNV 频率谱（GISTIC 样）：每染色体分 bin 的 gain / loss 频率（0–1），含少量 focal 峰
+synth_cnv_freq <- function(seed = 56, n_chr = 22, bins_per = 60) {
+  set.seed(seed)
+  chrs <- paste0("chr", seq_len(n_chr))
+  do.call(rbind, lapply(seq_along(chrs), function(k) {
+    b    <- bins_per - (k %% 5) * 4
+    pos  <- seq_len(b)
+    peak_g <- sample(pos, 1); peak_l <- sample(pos, 1); sg <- (b * 0.05)^2
+    gain <- pmin(0.9, pmax(0, 0.10 + 0.50 * exp(-((pos - peak_g)^2) / (2 * sg)) + rnorm(b, 0, 0.03)))
+    loss <- pmin(0.9, pmax(0, 0.08 + 0.45 * exp(-((pos - peak_l)^2) / (2 * sg)) + rnorm(b, 0, 0.03)))
+    data.frame(chr = factor(chrs[k], levels = chrs), bin = pos, gain = gain, loss = loss)
+  }))
+}
